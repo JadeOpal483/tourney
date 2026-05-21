@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tornelo Display Upload</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --panel: #fffdf8;
+      --ink: #1f1f23;
+      --muted: #6a5e4a;
+      --accent: #b6862c;
+      --border: #d8c9aa;
+      --win: #3b8558;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Source Sans 3", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 420px at 10% -10%, #efe3ca 0%, transparent 60%),
+        linear-gradient(180deg, #f8f4eb 0%, #efe8da 100%);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 18px; }
+    .top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .title { font-family: "Bitter", serif; font-size: 32px; letter-spacing: 0.3px; }
+    .subtitle { color: var(--muted); font-size: 14px; }
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--ink);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn.primary {
+      background: var(--accent);
+      border-color: #8a6119;
+      color: #fff;
+      font-weight: 600;
+    }
+    .meta {
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 10px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 8px 22px rgba(39,30,12,0.08);
+    }
+    .table {
+      display: inline-block;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: #57401a;
+      border-radius: 999px;
+      padding: 3px 9px;
+      margin-bottom: 8px;
+    }
+    .player {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 16px;
+      padding: 6px 0;
+      border-bottom: 1px dashed #e5dbc7;
+    }
+    .player:last-of-type { border-bottom: none; }
+    .name { font-weight: 600; }
+    .color {
+      min-width: 58px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 3px 7px;
+    }
+    .white { background: #ededed; color: #2b2b2b; }
+    .black { background: #2d2f35; color: #fff; }
+    .status { margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .ok { color: var(--win); font-weight: 600; }
+    .empty {
+      margin-top: 28px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255,255,255,0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">Tornelo Pairings Display</div>
+        <div class="subtitle">Upload a Tornelo pairings CSV after each round.</div>
+      </div>
+      <div class="controls">
+        <input id="csvInput" type="file" accept=".csv,text/csv" style="display:none">
+        <button class="btn primary" id="uploadBtn">Upload Pairings CSV</button>
+        <button class="btn" id="clearBtn">Clear Snapshot</button>
+      </div>
+    </div>
+
+    <div class="meta" id="meta"></div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty" style="display:none">No pairings loaded yet.</div>
+  </div>
+
+  <script>
+    const STORE_KEY = 'tornelo_pairings_snapshot_v1';
+
+    function splitCsvLine(line) {
+      const out = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          out.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur);
+      return out.map(x => x.trim());
+    }
+
+    function parsePairingsCsv(text, fileName) {
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (!lines.length) throw new Error('Empty CSV');
+      const headers = splitCsvLine(lines[0]);
+      const idx = key => headers.indexOf(key);
+      const tableIdx = idx('#B');
+      const whiteIdx = idx('White player');
+      const blackIdx = idx('Black player');
+      const whiteScoreIdx = idx('Score');
+      const blackScoreIdx = headers.lastIndexOf('Score');
+      const resultIdx = idx('Result');
+      if (tableIdx === -1 || whiteIdx === -1 || blackIdx === -1) throw new Error('Unexpected CSV format');
+
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = splitCsvLine(lines[i]);
+        const white = cols[whiteIdx] || '';
+        const black = cols[blackIdx] || '';
+        if (!white || !black) continue;
+        rows.push({
+          table: cols[tableIdx] || String(i),
+          white,
+          black,
+          whiteScore: whiteScoreIdx >= 0 ? (cols[whiteScoreIdx] || '') : '',
+          blackScore: blackScoreIdx >= 0 ? (cols[blackScoreIdx] || '') : '',
+          result: resultIdx >= 0 ? (cols[resultIdx] || '-') : '-',
+        });
+      }
+
+      const roundMatch = (fileName || '').match(/round[-_\s]*(\d+)/i);
+      return {
+        roundLabel: roundMatch ? `Round ${roundMatch[1]}` : 'Current Round',
+        fileName: fileName || 'pairings.csv',
+        uploadedAt: new Date().toISOString(),
+        pairings: rows,
+      };
+    }
+
+    function saveSnapshot(snapshot) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(snapshot));
+    }
+
+    function loadSnapshot() {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
+    function render(snapshot) {
+      const meta = document.getElementById('meta');
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+
+      if (!snapshot || !Array.isArray(snapshot.pairings) || snapshot.pairings.length === 0) {
+        meta.innerHTML = '';
+        grid.innerHTML = '';
+        empty.style.display = '';
+        return;
+      }
+
+      empty.style.display = 'none';
+      const dt = new Date(snapshot.uploadedAt);
+      meta.innerHTML = `
+        <span><strong>${snapshot.roundLabel}</strong></span>
+        <span>File: ${snapshot.fileName}</span>
+        <span class="ok">Updated: ${dt.toLocaleString()}</span>
+        <span>${snapshot.pairings.length} boards</span>
+      `;
+
+      grid.innerHTML = snapshot.pairings.map(p => `
+        <div class="card">
+          <div class="table">Table ${p.table}</div>
+          <div class="player">
+            <span class="name">${p.white}</span>
+            <span class="color white">White</span>
+          </div>
+          <div class="player">
+            <span class="name">${p.black}</span>
+            <span class="color black">Black</span>
+          </div>
+          <div class="status">Result: ${p.result || '-'} | Scores: ${p.whiteScore || '-'} - ${p.blackScore || '-'}</div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+      document.getElementById('csvInput').click();
+    });
+
+    document.getElementById('csvInput').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const snapshot = parsePairingsCsv(text, file.name);
+        saveSnapshot(snapshot);
+        render(snapshot);
+      } catch (error) {
+        alert('Could not parse CSV: ' + error.message);
+      }
+      event.target.value = '';
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      localStorage.removeItem(STORE_KEY);
+      render(null);
+    });
+
+    render(loadSnapshot());
+  </script>
+</body>
+</html>

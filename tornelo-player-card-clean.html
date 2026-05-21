@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tornelo Player Card Clean</title>
+  <style>
+    :root {
+      --bg: #0e1420;
+      --panel: #131d2d;
+      --line: #2a3952;
+      --text: #edf3ff;
+      --muted: #9aaccc;
+      --accent: #3d9cff;
+      --ok: #63d08a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Plus Jakarta Sans", "Inter", sans-serif;
+      background:
+        radial-gradient(900px 420px at 120% -20%, #1b3157 0%, transparent 55%),
+        radial-gradient(700px 360px at -10% 120%, #15223d 0%, transparent 60%),
+        var(--bg);
+      padding: 20px 14px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    .title { font-size: 32px; font-weight: 800; letter-spacing: 0.2px; }
+    .sub { margin-top: 4px; color: var(--muted); font-size: 14px; }
+    .panel {
+      margin-top: 14px;
+      background: linear-gradient(180deg, #16233a, var(--panel));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 14px 26px rgba(0,0,0,0.25);
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    input {
+      flex: 1;
+      min-width: 220px;
+      background: #101a2c;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 11px 12px;
+      font-size: 15px;
+      outline: none;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: #0f1a2f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .primary {
+      background: var(--accent);
+      border-color: #267fdb;
+      color: #fff;
+      font-weight: 700;
+    }
+    .meta { margin-top: 10px; color: var(--muted); font-size: 13px; }
+    .ok { color: var(--ok); font-weight: 600; }
+    .card {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(10, 16, 28, 0.46);
+      padding: 14px;
+    }
+    .name { font-size: 23px; font-weight: 800; margin-bottom: 10px; }
+    .kv {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px dashed #344766;
+      font-size: 15px;
+    }
+    .kv:last-child { border-bottom: none; }
+    .label { color: var(--muted); }
+    .value { font-weight: 700; }
+    .pill {
+      border: 1px solid #4a5a76;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .white { background: #dce2ec; color: #1a2331; border-color: #9ba7b9; }
+    .black { background: #202736; color: #fff; border-color: #39465e; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">Player Card</div>
+    <div class="sub">Simple lookup from latest Tornelo CSV snapshot.</div>
+
+    <div class="panel">
+      <div class="row">
+        <input id="nameInput" list="nameList" placeholder="Enter player name">
+        <datalist id="nameList"></datalist>
+        <button class="primary" id="findBtn">Find</button>
+        <button id="uploadBtn">Upload CSV</button>
+        <input id="csvInput" type="file" accept=".csv,text/csv" style="display:none">
+      </div>
+      <div class="meta" id="meta">No snapshot loaded yet.</div>
+    </div>
+
+    <div class="panel" id="resultPanel">
+      <div class="meta">Type a player name and press Find.</div>
+    </div>
+  </div>
+
+  <script>
+    const STORE_KEY = 'tornelo_snapshot_safe_v1';
+    const MAX_BYTES = 2 * 1024 * 1024;
+
+    function parseCsvLine(line) {
+      const cells = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+          cells.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      cells.push(current.trim());
+      return cells;
+    }
+
+    function normalizeText(value) {
+      const text = String(value || '').replace(/\s+/g, ' ').trim();
+      return text.slice(0, 120);
+    }
+
+    function parseTorneloCsv(text, fileName) {
+      if (text.length > MAX_BYTES) throw new Error('CSV too large');
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (lines.length < 2) throw new Error('CSV is empty');
+
+      const headers = parseCsvLine(lines[0]);
+      const idx = name => headers.indexOf(name);
+      const whiteIndex = idx('White player');
+      const blackIndex = idx('Black player');
+      const resultIndex = idx('Result');
+      const scoreLeftIndex = idx('Score');
+      const scoreRightIndex = headers.lastIndexOf('Score');
+
+      if (whiteIndex < 0 || blackIndex < 0) throw new Error('Missing expected Tornelo columns');
+
+      const pairings = [];
+      for (let i = 1; i < lines.length; i++) {
+        const row = parseCsvLine(lines[i]);
+        const white = normalizeText(row[whiteIndex]);
+        const black = normalizeText(row[blackIndex]);
+        if (!white || !black) continue;
+        pairings.push({
+          white,
+          black,
+          result: normalizeText(resultIndex >= 0 ? row[resultIndex] : '-'),
+          scoreLeft: normalizeText(scoreLeftIndex >= 0 ? row[scoreLeftIndex] : ''),
+          scoreRight: normalizeText(scoreRightIndex >= 0 ? row[scoreRightIndex] : '')
+        });
+      }
+
+      const roundMatch = (fileName || '').match(/round[-_\s]*(\d+)/i);
+      return {
+        source: normalizeText(fileName || 'pairings.csv'),
+        round: roundMatch ? `Round ${roundMatch[1]}` : 'Current Round',
+        updatedAt: new Date().toISOString(),
+        pairings
+      };
+    }
+
+    function saveSnapshot(snapshot) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(snapshot));
+    }
+
+    function loadSnapshot() {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
+    function updateMeta(snapshot) {
+      const meta = document.getElementById('meta');
+      if (!snapshot || !snapshot.pairings) {
+        meta.textContent = 'No snapshot loaded yet.';
+        return;
+      }
+      meta.innerHTML = `${snapshot.round} · ${snapshot.pairings.length} pairings · <span class="ok">Updated ${new Date(snapshot.updatedAt).toLocaleString()}</span> · ${snapshot.source}`;
+    }
+
+    function updateNameList(snapshot) {
+      const list = document.getElementById('nameList');
+      list.innerHTML = '';
+      if (!snapshot || !snapshot.pairings) return;
+      const names = new Set();
+      snapshot.pairings.forEach(p => {
+        names.add(p.white);
+        names.add(p.black);
+      });
+      [...names].sort((a, b) => a.localeCompare(b)).forEach((name) => {
+        const option = document.createElement('option');
+        option.value = name;
+        list.appendChild(option);
+      });
+    }
+
+    function renderPlayer(playerName, snapshot) {
+      const resultPanel = document.getElementById('resultPanel');
+      resultPanel.innerHTML = '';
+      if (!snapshot || !snapshot.pairings) {
+        const msg = document.createElement('div');
+        msg.className = 'meta';
+        msg.textContent = 'Upload a CSV first.';
+        resultPanel.appendChild(msg);
+        return;
+      }
+
+      const name = normalizeText(playerName).toLowerCase();
+      if (!name) {
+        const msg = document.createElement('div');
+        msg.className = 'meta';
+        msg.textContent = 'Type a player name and press Find.';
+        resultPanel.appendChild(msg);
+        return;
+      }
+
+      const pairing = snapshot.pairings.find(p => p.white.toLowerCase() === name || p.black.toLowerCase() === name);
+      if (!pairing) {
+        const msg = document.createElement('div');
+        msg.className = 'meta';
+        msg.textContent = 'Player not found in current snapshot.';
+        resultPanel.appendChild(msg);
+        return;
+      }
+
+      const isWhite = pairing.white.toLowerCase() === name;
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const n = document.createElement('div');
+      n.className = 'name';
+      n.textContent = isWhite ? pairing.white : pairing.black;
+      card.appendChild(n);
+
+      function kv(label, valueNode) {
+        const row = document.createElement('div');
+        row.className = 'kv';
+        const l = document.createElement('span');
+        l.className = 'label';
+        l.textContent = label;
+        const v = document.createElement('span');
+        v.className = 'value';
+        if (typeof valueNode === 'string') v.textContent = valueNode;
+        else v.appendChild(valueNode);
+        row.append(l, v);
+        return row;
+      }
+
+      const colorPill = document.createElement('span');
+      colorPill.className = 'pill ' + (isWhite ? 'white' : 'black');
+      colorPill.textContent = isWhite ? 'White' : 'Black';
+
+      card.appendChild(kv('Round', snapshot.round));
+      card.appendChild(kv('Color', colorPill));
+      card.appendChild(kv('Opponent', isWhite ? pairing.black : pairing.white));
+      card.appendChild(kv('Result', pairing.result || '-'));
+      card.appendChild(kv('Score Line', `${pairing.scoreLeft || '-'} - ${pairing.scoreRight || '-'}`));
+
+      resultPanel.appendChild(card);
+    }
+
+    function loadFromStorageAndRender() {
+      const snapshot = loadSnapshot();
+      updateMeta(snapshot);
+      updateNameList(snapshot);
+      const prefill = new URLSearchParams(location.search).get('name');
+      if (prefill && !document.getElementById('nameInput').value) {
+        document.getElementById('nameInput').value = prefill;
+      }
+      if (prefill) renderPlayer(prefill, snapshot);
+    }
+
+    document.getElementById('findBtn').addEventListener('click', () => {
+      renderPlayer(document.getElementById('nameInput').value, loadSnapshot());
+    });
+
+    document.getElementById('nameInput').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') document.getElementById('findBtn').click();
+    });
+
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+      document.getElementById('csvInput').click();
+    });
+
+    document.getElementById('csvInput').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const snapshot = parseTorneloCsv(text, file.name);
+        saveSnapshot(snapshot);
+        updateMeta(snapshot);
+        updateNameList(snapshot);
+        renderPlayer(document.getElementById('nameInput').value, snapshot);
+      } catch (error) {
+        alert('Could not parse file: ' + error.message);
+      }
+      event.target.value = '';
+    });
+
+    loadFromStorageAndRender();
+  </script>
+</body>
+</html>

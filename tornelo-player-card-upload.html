@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tornelo Player Card</title>
+  <style>
+    :root {
+      --bg: #10141d;
+      --ink: #f4f7fc;
+      --muted: #9ba8c0;
+      --panel: #171e2a;
+      --panel2: #1d2635;
+      --accent: #4ea6ff;
+      --border: #2f3a4f;
+      --ok: #5cc48c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Manrope", "IBM Plex Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 460px at 105% -10%, #243654 0%, transparent 60%),
+        radial-gradient(700px 360px at -5% 110%, #15223b 0%, transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 24px 14px;
+    }
+    .wrap { max-width: 740px; margin: 0 auto; }
+    .head { margin-bottom: 14px; }
+    .title { font-size: 30px; font-weight: 800; letter-spacing: 0.2px; }
+    .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+    .panel {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.28);
+      margin-bottom: 12px;
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    input {
+      flex: 1;
+      min-width: 220px;
+      background: #101723;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 15px;
+      outline: none;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: #101723;
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      border-color: #2d7dcc;
+      color: #fff;
+      font-weight: 700;
+    }
+    .meta { color: var(--muted); font-size: 13px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(9,14,22,0.35);
+      padding: 14px;
+      margin-top: 10px;
+    }
+    .name { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+    .kv { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dashed #33415a; }
+    .kv:last-child { border-bottom: none; }
+    .label { color: var(--muted); }
+    .value { font-weight: 700; }
+    .pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid #3e4a65;
+    }
+    .white { background: #d9dce2; color: #20232a; border-color: #a6adbb; }
+    .black { background: #1f2430; color: #fff; border-color: #444f66; }
+    .ok { color: var(--ok); }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div class="title">Player Pairing Card</div>
+      <div class="sub">Connected to the latest Tornelo CSV snapshot on this device.</div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <input id="nameInput" list="nameList" placeholder="Enter player name">
+        <datalist id="nameList"></datalist>
+        <button class="primary" id="lookupBtn">Show Pairing</button>
+        <button id="uploadBtn">Upload CSV</button>
+        <input id="csvInput" type="file" accept=".csv,text/csv" style="display:none">
+      </div>
+      <div class="hint" id="snapshotMeta"></div>
+    </div>
+
+    <div class="panel" id="resultPanel">
+      <div class="meta">Enter a player name to see round, table, color, and opponent.</div>
+    </div>
+  </div>
+
+  <script>
+    const STORE_KEY = 'tornelo_pairings_snapshot_v1';
+
+    function splitCsvLine(line) {
+      const out = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+          out.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur);
+      return out.map(x => x.trim());
+    }
+
+    function parsePairingsCsv(text, fileName) {
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (!lines.length) throw new Error('Empty CSV');
+      const headers = splitCsvLine(lines[0]);
+      const idx = key => headers.indexOf(key);
+      const tableIdx = idx('#B');
+      const whiteIdx = idx('White player');
+      const blackIdx = idx('Black player');
+      const whiteScoreIdx = idx('Score');
+      const blackScoreIdx = headers.lastIndexOf('Score');
+      const resultIdx = idx('Result');
+      if (tableIdx === -1 || whiteIdx === -1 || blackIdx === -1) throw new Error('Unexpected CSV format');
+
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = splitCsvLine(lines[i]);
+        const white = cols[whiteIdx] || '';
+        const black = cols[blackIdx] || '';
+        if (!white || !black) continue;
+        rows.push({
+          table: cols[tableIdx] || String(i),
+          white,
+          black,
+          whiteScore: whiteScoreIdx >= 0 ? (cols[whiteScoreIdx] || '') : '',
+          blackScore: blackScoreIdx >= 0 ? (cols[blackScoreIdx] || '') : '',
+          result: resultIdx >= 0 ? (cols[resultIdx] || '-') : '-',
+        });
+      }
+      const roundMatch = (fileName || '').match(/round[-_\s]*(\d+)/i);
+      return {
+        roundLabel: roundMatch ? `Round ${roundMatch[1]}` : 'Current Round',
+        fileName: fileName || 'pairings.csv',
+        uploadedAt: new Date().toISOString(),
+        pairings: rows,
+      };
+    }
+
+    function saveSnapshot(snapshot) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(snapshot));
+    }
+
+    function loadSnapshot() {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
+    function updateMeta(snapshot) {
+      const meta = document.getElementById('snapshotMeta');
+      if (!snapshot) {
+        meta.textContent = 'No snapshot loaded yet. Upload a Tornelo pairings CSV.';
+        return;
+      }
+      const dt = new Date(snapshot.uploadedAt);
+      meta.innerHTML = `${snapshot.roundLabel} <span class="ok">Updated ${dt.toLocaleString()}</span> from ${snapshot.fileName}`;
+    }
+
+    function refreshNameList(snapshot) {
+      const list = document.getElementById('nameList');
+      list.innerHTML = '';
+      if (!snapshot || !snapshot.pairings) return;
+      const names = new Set();
+      snapshot.pairings.forEach(pair => {
+        names.add(pair.white);
+        names.add(pair.black);
+      });
+      [...names].sort((a, b) => a.localeCompare(b)).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        list.appendChild(option);
+      });
+    }
+
+    function renderPlayerCard(name, snapshot) {
+      const panel = document.getElementById('resultPanel');
+      if (!snapshot || !Array.isArray(snapshot.pairings)) {
+        panel.innerHTML = '<div class="meta">No snapshot loaded.</div>';
+        return;
+      }
+      const query = (name || '').trim().toLowerCase();
+      if (!query) {
+        panel.innerHTML = '<div class="meta">Enter a player name to see pairing details.</div>';
+        return;
+      }
+      const pairing = snapshot.pairings.find(pair =>
+        pair.white.toLowerCase() === query || pair.black.toLowerCase() === query
+      );
+      if (!pairing) {
+        panel.innerHTML = '<div class="meta">Player not found in latest pairings.</div>';
+        return;
+      }
+
+      const isWhite = pairing.white.toLowerCase() === query;
+      const playerName = isWhite ? pairing.white : pairing.black;
+      const opponent = isWhite ? pairing.black : pairing.white;
+      const color = isWhite ? 'White' : 'Black';
+      const colorClass = isWhite ? 'white' : 'black';
+
+      panel.innerHTML = `
+        <div class="card">
+          <div class="name">${playerName}</div>
+          <div class="kv"><span class="label">Round</span><span class="value">${snapshot.roundLabel}</span></div>
+          <div class="kv"><span class="label">Table</span><span class="value">${pairing.table}</span></div>
+          <div class="kv"><span class="label">Color</span><span class="value"><span class="pill ${colorClass}">${color}</span></span></div>
+          <div class="kv"><span class="label">Opponent</span><span class="value">${opponent}</span></div>
+          <div class="kv"><span class="label">Result</span><span class="value">${pairing.result || '-'}</span></div>
+        </div>
+      `;
+    }
+
+    function bootstrap(snapshot) {
+      updateMeta(snapshot);
+      refreshNameList(snapshot);
+      const prefill = new URLSearchParams(location.search).get('name') || '';
+      const input = document.getElementById('nameInput');
+      if (prefill) input.value = prefill;
+      if (input.value.trim()) renderPlayerCard(input.value.trim(), snapshot);
+    }
+
+    document.getElementById('lookupBtn').addEventListener('click', () => {
+      const snapshot = loadSnapshot();
+      const name = document.getElementById('nameInput').value.trim();
+      renderPlayerCard(name, snapshot);
+    });
+
+    document.getElementById('nameInput').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') document.getElementById('lookupBtn').click();
+    });
+
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+      document.getElementById('csvInput').click();
+    });
+
+    document.getElementById('csvInput').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const snapshot = parsePairingsCsv(text, file.name);
+        saveSnapshot(snapshot);
+        bootstrap(snapshot);
+      } catch (error) {
+        alert('Could not parse CSV: ' + error.message);
+      }
+      event.target.value = '';
+    });
+
+    bootstrap(loadSnapshot());
+  </script>
+</body>
+</html>

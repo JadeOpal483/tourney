@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Café — Tournament Admin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap');
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141418;
+    --surface2: #1c1c22;
+    --surface3: #242430;
+    --border: #2a2a38;
+    --accent: #c9a84c;
+    --accent2: #e8c76a;
+    --accent-dim: rgba(201,168,76,0.15);
+    --text: #e8e4d8;
+    --text-dim: #8a8478;
+    --text-muted: #4a4840;
+    --green: #4caf7a;
+    --red: #e05555;
+    --blue: #5592e0;
+    --white-sq: #f0e6c8;
+    --radius: 8px;
+    --radius-lg: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 16px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; align-items: center; gap: 14px;
+    height: 62px; position: sticky; top: 0; z-index: 100;
+  }
+  .header-logo { font-family: 'Playfair Display', serif; font-size: 21px; font-weight: 900; color: var(--accent); white-space: nowrap; }
+  .header-logo span { color: var(--text); font-weight: 400; }
+  .header-name { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+  .header-sep { flex: 1; }
+
+  /* ── Layout ── */
+  .layout { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 112px); }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  .main { padding: 20px; overflow-y: auto; }
+
+  /* ── Cards ── */
+  .card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .card-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--accent); margin-bottom: 12px; }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface3); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0d0d0f; font-weight: 600; }
+  .btn.primary:hover { background: var(--accent2); border-color: var(--accent2); color: #0d0d0f; }
+  .btn.success { background: var(--green); border-color: var(--green); color: #0d0d0f; font-weight: 600; }
+  .btn.success:hover { filter: brightness(1.1); }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: rgba(224,85,85,0.1); }
+
+  /* ── Inputs ── */
+  input[type="text"], input[type="number"], select { background: var(--surface3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius); padding: 7px 11px; font-family: 'Crimson Pro', serif; font-size: 15px; width: 100%; outline: none; transition: border-color 0.15s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--surface3); }
+  label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.5px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+  .form-row { margin-bottom: 10px; }
+  .form-row:last-child { margin-bottom: 0; }
+  .input-row { display: flex; gap: 7px; }
+  .input-row input { flex: 1; }
+
+  /* ── Tiebreak note ── */
+  .tiebreak-note { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 5px; line-height: 1.6; }
+
+  /* ── Player list ── */
+  .player-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; margin-bottom: 2px; transition: background 0.1s; }
+  .player-item:hover { background: var(--surface3); }
+  .player-item .pi-name { flex: 1; font-size: 15px; }
+  .player-item .pi-score { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 26px; text-align: right; }
+  .pi-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0 3px; line-height: 1; transition: color 0.1s; }
+  .pi-del:hover { color: var(--red); }
+
+  /* ── Hint ── */
+  .hint { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); margin-top: 5px; line-height: 1.6; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .tab-btn { padding: 7px 16px; border: none; background: none; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .rounds-nav {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .rounds-nav .hint {
+    margin-top: 0;
+  }
+  .rounds-grid {
+    display: flex; flex-direction: column; gap: 9px;
+  }
+  .rounds-empty {
+    color: var(--text-muted); font-style: italic; padding: 10px 0;
+  }
+
+  /* ── Standings ── */
+  .standings-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .standings-table th { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .standings-table th.tb-col { color: var(--accent); }
+  .standings-table td { padding: 8px 10px; border-bottom: 1px solid rgba(42,42,56,0.35); vertical-align: middle; }
+  .standings-table tr.leader td { background: rgba(201,168,76,0.06); }
+  .standings-table tr:hover td  { background: rgba(255,255,255,0.02); }
+  .rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; background: var(--surface3); color: var(--text-dim); }
+  .rank-badge.gold   { background: #c9a84c; color: #0d0d0f; }
+  .rank-badge.silver { background: #a8a8b8; color: #0d0d0f; }
+  .rank-badge.bronze { background: #a0654a; color: #0d0d0f; }
+  .score-cell { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--accent); font-size: 15px; }
+  .stat-cell  { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); text-align: center; }
+  .tb-cell    { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); opacity: 0.7; }
+  .table-cell { text-align: center; }
+  .table-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; padding: 2px 7px; border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+    color: var(--accent); border: 1px solid rgba(201,168,76,0.35);
+    background: rgba(201,168,76,0.1);
+  }
+  .table-chip.bye {
+    color: var(--blue); border-color: rgba(85,146,224,0.35); background: rgba(85,146,224,0.1);
+  }
+
+  /* ── Round header ── */
+  .round-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .round-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; }
+  .round-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 9px; border-radius: 20px; background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(201,168,76,0.2); }
+  .round-actions { margin-left: auto; display: flex; gap: 7px; flex-wrap: wrap; }
+
+  /* ── Pairing cards ── */
+  .pairings-grid { display: flex; flex-direction: column; gap: 9px; }
+  .pairing-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 16px 13px; display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 10px; align-items: center; transition: border-color 0.2s; position: relative; }
+  .pairing-card.locked     { opacity: 0.55; pointer-events: none; border-style: dashed; }
+  .pairing-card.result-set { border-color: rgba(201,168,76,0.22); }
+  .pairing-card.bye-card   { grid-template-columns: 1fr auto; }
+  .pair-table-badge {
+    position: absolute; top: 6px; right: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    color: #0d0d0f; background: linear-gradient(135deg, #c9a84c, #f0c040);
+    border: 1px solid rgba(240,192,64,0.75); border-radius: 999px;
+    padding: 1px 8px; box-shadow: 0 0 12px rgba(201,168,76,0.28);
+  }
+  .player-slot { display: flex; flex-direction: column; gap: 2px; }
+  .color-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: 1.5px; }
+  .color-label.white { color: var(--white-sq); }
+  .color-label.black { color: var(--text-muted); }
+  .pname  { font-size: 17px; font-weight: 600; }
+  .pscore { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); }
+  .vs-sep { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--text-muted); padding: 0 2px; }
+  .result-btns { display: flex; flex-direction: column; gap: 4px; min-width: 84px; }
+  .res-btn { padding: 4px 8px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface3); color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 10px; cursor: pointer; transition: all 0.13s; width: 100%; text-align: center; }
+  .res-btn:hover.white-win  { background: rgba(240,230,200,0.12); color: var(--white-sq); border-color: var(--white-sq); }
+  .res-btn:hover.draw       { background: rgba(85,146,224,0.12);  color: var(--blue);     border-color: var(--blue); }
+  .res-btn:hover.black-win  { background: rgba(42,28,18,0.35);    color: #a09080;         border-color: #705040; }
+  .res-btn.active.white-win { background: rgba(240,230,200,0.16); color: var(--white-sq); border-color: var(--white-sq); }
+  .res-btn.active.draw      { background: rgba(85,146,224,0.16);  color: var(--blue);     border-color: var(--blue); }
+  .res-btn.active.black-win { background: rgba(55,36,20,0.5);     color: #c0a080;         border-color: #705040; }
+  .locked-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); text-align: center; padding: 3px 6px; }
+
+  /* ── Prior rounds ── */
+  .prior-rounds { margin-top: 28px; }
+  .prior-round-section { margin-bottom: 18px; }
+  .prior-round-hd {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    padding-bottom: 7px; border-bottom: 1px solid var(--border);
+  }
+  .prior-round-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim);
+  }
+  .prior-round-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    padding: 2px 7px; border-radius: 20px;
+    background: var(--accent-dim); color: var(--accent);
+    border: 1px solid rgba(201,168,76,0.2);
+  }
+  .prior-edit-note {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-muted); margin-left: auto;
+    font-style: italic;
+  }
+  .pairing-card.prior { opacity: 0.85; }
+  .pairing-card.prior:hover { opacity: 1; border-color: rgba(201,168,76,0.3); }
+
+  /* ── Round timer (existing) ── */
+  .timer-display { font-family: 'JetBrains Mono', monospace; font-size: 52px; font-weight: 600; letter-spacing: 3px; color: var(--accent); text-align: center; padding: 14px 0; transition: color 0.3s; }
+  .timer-display.warning { color: #e07840; }
+  .timer-display.expired { color: var(--red); }
+  .timer-controls { display: flex; gap: 8px; justify-content: center; }
+
+  /* ── Swap ── */
+  .swap-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .swap-row select { flex: 1; min-width: 110px; }
+  .section-note { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+  /* ── Empty ── */
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); font-style: italic; }
+
+  /* ── Status bar ── */
+  .status-bar { background: var(--surface2); border-top: 1px solid var(--border); padding: 7px 20px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); display: flex; gap: 14px; align-items: center; position: sticky; bottom: 0; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 48px; left: 50%; transform: translateX(-50%) translateY(14px); background: var(--surface3); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: var(--radius); font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0; transition: all 0.22s; pointer-events: none; z-index: 999; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ════════════════════════════════════════════════════
+     CHESS CLOCKS TAB — new styles only, nothing above changed
+  ════════════════════════════════════════════════════ */
+
+  /* Connection pill */
+  .ck-conn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .ck-conn.connected { border-color: rgba(76,175,122,0.4); color: var(--green); }
+  .ck-conn.error     { border-color: rgba(224,85,85,0.4);  color: var(--red); }
+  .ck-conn-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .ck-conn.connected .ck-conn-dot { animation: pulse 1.6s infinite; }
+
+  /* Board selector */
+  .ck-boards { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .ck-board-btn {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface3); color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .ck-board-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .ck-board-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .ck-board-btn.running { border-color: var(--green); color: var(--green); }
+  .ck-board-btn.finished { border-color: var(--red); color: var(--red); }
+
+  /* Config row */
+  .ck-config { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 14px; }
+
+  /* Clock faces — the two big player clocks */
+  .ck-clocks {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 14px;
+  }
+  .ck-face {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: var(--radius-lg); padding: 16px 14px; text-align: center;
+    transition: border-color 0.25s, background 0.25s;
+  }
+  .ck-face.active-clock {
+    border-color: var(--accent);
+    background: rgba(201,168,76,0.06);
+  }
+  .ck-face.flagged { border-color: var(--red) !important; background: rgba(224,85,85,0.07) !important; }
+  .ck-face-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .ck-face.active-clock .ck-face-label { color: var(--accent); }
+  .ck-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px; font-weight: 700; letter-spacing: 2px; line-height: 1;
+    color: var(--text-dim); transition: color 0.2s;
+  }
+  .ck-face.active-clock .ck-time { color: var(--accent); }
+  .ck-time.warning { color: #e07840 !important; }
+  .ck-time.expired { color: var(--red) !important; }
+  .ck-inc {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-muted); margin-top: 6px;
+  }
+
+  /* Controls row */
+  .ck-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ck-controls .btn { flex: 1; justify-content: center; }
+
+  /* Move button — large */
+  .ck-move-btn {
+    width: 100%; padding: 14px; border-radius: var(--radius-lg);
+    border: 2px solid var(--accent); background: var(--accent-dim);
+    color: var(--accent); font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 600; letter-spacing: 1px;
+    cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+  }
+  .ck-move-btn:hover:not(:disabled) { background: var(--accent); color: #0d0d0f; }
+  .ck-move-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  /* Status line */
+  .ck-status {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-muted); text-align: center; margin-top: 10px;
+  }
+  .ck-status.ok { color: var(--green); }
+  .ck-status.warn { color: #e07840; }
+  .ck-status.bad  { color: var(--red); }
+
+  /* Board list (multi-board overview) */
+  .ck-board-list { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .ck-board-row {
+    display: grid; grid-template-columns: 80px 1fr 90px 90px 70px;
+    align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .ck-board-row:hover { border-color: var(--accent); }
+  .ck-board-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .ck-board-id { color: var(--accent); font-weight: 700; }
+  .ck-board-names { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ck-board-wt, .ck-board-bt { text-align: right; }
+  .ck-board-wt.low, .ck-board-bt.low { color: var(--red); }
+  .ck-board-st { text-align: center; }
+  .ck-board-st.running  { color: var(--green); }
+  .ck-board-st.paused   { color: #e07840; }
+  .ck-board-st.finished { color: var(--red); }
+  .ck-board-st.idle     { color: var(--text-muted); }
+
+  /* No board selected placeholder */
+  .ck-empty { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 24px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">♟ Chess<span>Café</span></div>
+  <div class="header-name" id="headerName"></div>
+  <div class="header-sep"></div>
+  <button class="btn" onclick="openDisplay()">📺 Display</button>
+  <button class="btn primary" onclick="triggerPodium()">🏆 Podium</button>
+  <button class="btn" onclick="dismissPodium()" id="btnDismissPodium" style="display:none">✕ Dismiss Podium</button>
+  <button class="btn" onclick="exportCSV()">⬇ CSV</button>
+  <button class="btn danger" onclick="fullReset()">↺ Reset</button>
+</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="card">
+      <div class="card-title">Tournament</div>
+      <div class="form-row">
+        <label>Name</label>
+        <input type="text" id="tournamentName" placeholder="Friday Night Swiss" oninput="saveMeta()">
+      </div>
+      <div class="form-row">
+        <label>
+          Rounds
+          <span id="roundsAutoLabel" style="color:var(--accent);margin-left:3px">(auto)</span>
+        </label>
+        <div class="input-row">
+          <input type="number" id="totalRounds" placeholder="Auto" min="1" max="99" oninput="onRoundsInput()">
+          <button class="btn" onclick="resetRoundsToAuto()" title="Reset to auto">↺</button>
+        </div>
+        <div class="hint" id="roundsHint">Add players to see recommendation</div>
+      </div>
+      <div class="form-row">
+        <label>Podium Places (Top X)</label>
+        <input type="number" id="podiumTopN" min="1" max="50" value="5" oninput="onPodiumTopInput()">
+      </div>
+      <div class="form-row">
+        <label>Tiebreak Method</label>
+        <select id="tiebreakMethod" onchange="onTiebreakChange()">
+          <option value="buchholz">Buchholz (sum of opponents' scores)</option>
+          <option value="buchholz-cut1">Buchholz Cut-1 (drop lowest opponent)</option>
+          <option value="sonneborn">Sonneborn-Berger (quality of wins)</option>
+          <option value="head-to-head">Head-to-Head (direct encounter)</option>
+          <option value="wins">Number of Wins</option>
+          <option value="cumulative">Cumulative Score (sum of running scores)</option>
+          <option value="black-wins">Wins with Black Pieces</option>
+        </select>
+        <div class="tiebreak-note" id="tiebreakNote"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Add Player</div>
+      <div class="input-row">
+        <input type="text" id="newPlayerName" placeholder="Player name"
+               onkeydown="if(event.key==='Enter')addPlayer()">
+        <button class="btn primary" onclick="addPlayer()">+</button>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;min-height:0">
+      <div class="card-title">Players (<span id="playerCount">0</span>)</div>
+      <div id="playerList"></div>
+    </div>
+
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('pairings',this)">Pairings</button>
+      <button class="tab-btn" onclick="switchTab('rounds',this)">Rounds</button>
+      <button class="tab-btn" onclick="switchTab('standings',this)">Standings</button>
+      <button class="tab-btn" onclick="switchTab('timer',this)">Timer</button>
+      <button class="tab-btn" onclick="switchTab('tools',this)">Tools</button>
+      <button class="tab-btn" onclick="switchTab('clocks',this)">Chess Clocks</button>
+    </div>
+
+    <!-- PAIRINGS TAB -->
+    <div class="tab-panel active" id="tab-pairings">
+      <div class="empty-state" id="pairingsEmpty">Add at least 2 players to begin.</div>
+      <div id="roundContainer" style="display:none">
+        <div class="round-header">
+          <div class="round-title" id="roundTitle">Round 1</div>
+          <div class="round-badge" id="roundStatus">Not started</div>
+          <div class="round-actions">
+            <button class="btn primary" id="btnStart"  onclick="startRound()">▶ Start Round 1</button>
+            <button class="btn success" id="btnNext"   onclick="nextRound()"     style="display:none">Next Round →</button>
+            <button class="btn danger"  id="btnEnd"    onclick="endTournament()"  style="display:none">🏁 End</button>
+          </div>
+        </div>
+        <div class="pairings-grid" id="pairingsGrid"></div>
+      </div>
+    </div>
+
+    <!-- ROUNDS TAB -->
+    <div class="tab-panel" id="tab-rounds">
+      <div class="card">
+        <div class="card-title">Completed Rounds</div>
+        <div class="rounds-nav">
+          <button class="btn" id="btnPrevRoundView" onclick="navigateRounds(-1)">← Prev</button>
+          <select id="roundPicker" onchange="onRoundPickerChange()" style="min-width:170px"></select>
+          <button class="btn" id="btnNextRoundView" onclick="navigateRounds(1)">Next →</button>
+          <span class="hint" id="roundViewMeta"></span>
+        </div>
+        <div id="roundsViewBody" class="rounds-grid"></div>
+      </div>
+    </div>
+
+    <!-- STANDINGS TAB -->
+    <div class="tab-panel" id="tab-standings">
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="standings-table">
+          <thead><tr>
+            <th>#</th><th>Player</th><th>Score</th>
+            <th class="tb-col" id="tbColHeader">Buchholz</th>
+            <th style="text-align:center">Table</th>
+            <th style="text-align:center">W</th><th style="text-align:center">D</th>
+            <th style="text-align:center">L</th><th style="text-align:center">⬜</th>
+            <th style="text-align:center">⬛</th><th style="text-align:center">BYE</th>
+          </tr></thead>
+          <tbody id="standingsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TIMER TAB (unchanged) -->
+    <div class="tab-panel" id="tab-timer">
+      <div class="card" style="max-width:360px;margin:0 auto">
+        <div class="card-title">Round Timer</div>
+        <div class="timer-display" id="timerDisplay">--:--</div>
+        <div class="timer-controls" style="margin-top:12px">
+          <button class="btn primary" onclick="timerStart()">▶ Start</button>
+          <button class="btn" onclick="timerPause()">⏸ Pause</button>
+          <button class="btn" onclick="timerReset()">↺ Reset</button>
+        </div>
+        <div style="margin-top:14px">
+          <label>Duration (minutes)</label>
+          <input type="number" id="timerMins" value="60" min="1" max="300" style="margin-top:4px">
+          <button class="btn" style="margin-top:8px;width:100%" onclick="applyTimer()">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOLS TAB (unchanged) -->
+    <div class="tab-panel" id="tab-tools">
+      <div class="card">
+        <div class="card-title">Manual Pairing Swap</div>
+        <p class="section-note">Swap two players' board assignments before any results are entered in the current round.</p>
+        <div class="swap-row">
+          <select id="swapA"><option value="">Player A…</option></select>
+          <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);font-size:13px">↔</span>
+          <select id="swapB"><option value="">Player B…</option></select>
+          <button class="btn" onclick="doSwap()">Swap</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════
+         CHESS CLOCKS TAB — completely new, nothing existing touched
+    ════════════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-clocks">
+
+      <!-- Connection status -->
+      <div class="ck-conn" id="ckConn">
+        <span class="ck-conn-dot"></span>
+        <span id="ckConnLabel">Connecting to clock server…</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+
+        <!-- Left: active board control -->
+        <div>
+
+          <!-- Board selector buttons -->
+          <div class="ck-boards" id="ckBoards">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);line-height:28px">
+              No boards configured yet →
+            </span>
+          </div>
+
+          <!-- Selected board clocks -->
+          <div id="ckDetail">
+            <div class="ck-empty">Select or create a board to control clocks.</div>
+          </div>
+
+        </div>
+
+        <!-- Right: configure + board list -->
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-title">Configure Board</div>
+            <div class="form-row">
+              <label>Board ID</label>
+              <input type="text" id="ckBoardId" placeholder="e.g. board-1" value="board-1">
+            </div>
+            <div class="form-row">
+              <label>Base Time (seconds)</label>
+              <input type="number" id="ckBaseTime" value="300" min="10" max="7200">
+            </div>
+            <div class="form-row">
+              <label>Increment (seconds per move)</label>
+              <input type="number" id="ckIncrement" value="5" min="0" max="60">
+            </div>
+            <button class="btn primary" style="width:100%;justify-content:center;margin-top:4px"
+                    onclick="ckConfigure()">Create / Reconfigure Board</button>
+          </div>
+
+          <!-- All boards overview -->
+          <div class="card">
+            <div class="card-title">All Boards</div>
+            <div id="ckBoardList">
+              <div class="ck-empty">No boards yet</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- end #tab-clocks -->
+
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-dot"></div>
+  <span>Auto-saved</span>
+  <span id="statusInfo" style="color:var(--text-muted)"></span>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- ─────────────────────────────────────────────────────────────────
+     Socket.io client — loaded from the Node server.
+     Falls back gracefully: if the server isn't running, the rest of
+     the page still works normally (tournament management is localStorage).
+───────────────────────────────────────────────────────────────────── -->
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  TIEBREAK DEFINITIONS
+// ═══════════════════════════════════════════════════
+const TIEBREAK_DEFS = {
+  'buchholz':      { label: 'Buchholz',       note: "Sum of all opponents' final scores. Standard Swiss tiebreak." },
+  'buchholz-cut1': { label: 'Buchholz Cut-1',  note: 'Buchholz minus the lowest-scoring opponent. Reduces luck of draw.' },
+  'sonneborn':     { label: 'SB Score',        note: 'Sum of scores of players you beat (full) + half score of draws. Rewards quality wins.' },
+  'head-to-head':  { label: 'Head-to-Head',    note: 'Direct result between tied players. Only meaningful for 2-way ties.' },
+  'wins':          { label: 'Wins',            note: 'Total number of decisive wins. Discourages draw offers.' },
+  'cumulative':    { label: 'Cumulative',      note: 'Sum of your score after each round. Rewards consistent early performance.' },
+  'black-wins':    { label: 'Wins w/ Black',   note: 'Number of wins achieved with the Black pieces. Rewards harder wins.' },
+};
+
+// ═══════════════════════════════════════════════════
+//  STORAGE & STATE
+// ═══════════════════════════════════════════════════
+const STORE_KEY = 'chessCafeTournament';
+
+function defaultState() {
+  return {
+    meta:  { name: '', totalRoundsOverride: null, ended: false, tiebreak: 'buchholz', podiumTopN: 5 },
+    players:      [],
+    rounds:       [],
+    currentRound: 0,
+    timer:  { duration: 3600, remaining: 3600, startTime: null, running: false },
+    podium: false,
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return defaultState();
+    const saved = JSON.parse(raw);
+    const def   = defaultState();
+    return {
+      meta:         { ...def.meta,  ...saved.meta  },
+      players:      Array.isArray(saved.players)  ? saved.players  : [],
+      rounds:       Array.isArray(saved.rounds)   ? saved.rounds   : [],
+      currentRound: saved.currentRound || 0,
+      timer:        { ...def.timer, ...saved.timer },
+      podium:       !!saved.podium,
+    };
+  } catch(e) { return defaultState(); }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save tournament state:', e);
+    showToast('Save failed: storage unavailable');
+    return false;
+  }
+  updateStatusBar();
+  return true;
+}
+
+let state = loadState();
+let timerIntervalId = null;
+let selectedRoundViewNumber = null;
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+function init() {
+  document.getElementById('tournamentName').value  = state.meta.name || '';
+  document.getElementById('totalRounds').value     = state.meta.totalRoundsOverride || '';
+  document.getElementById('timerMins').value       = Math.round(state.timer.duration / 60) || 60;
+  document.getElementById('headerName').textContent= state.meta.name || '';
+  document.getElementById('tiebreakMethod').value  = state.meta.tiebreak || 'buchholz';
+  document.getElementById('podiumTopN').value      = getPodiumTopN();
+  updateTiebreakUI();
+  updateRoundsHint();
+  renderPlayerList();
+  renderRound();
+  renderStandings();
+  renderRoundsTab();
+  populateSwapSelects();
+  if (timerIntervalId) clearInterval(timerIntervalId);
+  timerIntervalId = setInterval(tickTimer, 500);
+  tickTimer();
+  updateStatusBar();
+}
+
+// ═══════════════════════════════════════════════════
+//  META
+// ═══════════════════════════════════════════════════
+function calcAutoRounds(n) { return n < 2 ? 1 : Math.ceil(Math.log2(n)); }
+function getEffectiveRounds() { return state.meta.totalRoundsOverride || calcAutoRounds(state.players.length); }
+function getPodiumTopN() {
+  const n = parseInt(state.meta.podiumTopN, 10);
+  return Number.isFinite(n) ? Math.max(1, Math.min(50, n)) : 5;
+}
+
+function saveMeta() {
+  state.meta.name = document.getElementById('tournamentName').value.trim();
+  document.getElementById('headerName').textContent = state.meta.name;
+  saveState();
+}
+function onRoundsInput() {
+  const v = parseInt(document.getElementById('totalRounds').value);
+  state.meta.totalRoundsOverride = v > 0 ? v : null;
+  updateRoundsHint(); saveState();
+}
+function onPodiumTopInput() {
+  const raw = parseInt(document.getElementById('podiumTopN').value, 10);
+  const v = Number.isFinite(raw) ? Math.max(1, Math.min(50, raw)) : 5;
+  state.meta.podiumTopN = v;
+  document.getElementById('podiumTopN').value = v;
+  saveState();
+}
+function resetRoundsToAuto() {
+  state.meta.totalRoundsOverride = null;
+  document.getElementById('totalRounds').value = '';
+  updateRoundsHint(); saveState();
+}
+function updateRoundsHint() {
+  const n = state.players.length;
+  const auto = calcAutoRounds(n);
+  const isOverride = !!state.meta.totalRoundsOverride;
+  const effective  = getEffectiveRounds();
+  const lbl = document.getElementById('roundsAutoLabel');
+  lbl.textContent = isOverride ? '(manual)' : '(auto)';
+  lbl.style.color = isOverride ? 'var(--text-dim)' : 'var(--accent)';
+  document.getElementById('roundsHint').textContent = n >= 2
+    ? `${n} players → ${auto} rounds recommended · using ${effective}`
+    : 'Add players to see recommendation';
+}
+function onTiebreakChange() {
+  state.meta.tiebreak = document.getElementById('tiebreakMethod').value;
+  updateTiebreakUI();
+  if (state.rounds.length > 0) { recalcTiebreak(); saveState(); renderStandings(); }
+  else saveState();
+}
+function updateTiebreakUI() {
+  const tb  = state.meta.tiebreak || 'buchholz';
+  const def = TIEBREAK_DEFS[tb];
+  document.getElementById('tiebreakNote').textContent  = def ? def.note  : '';
+  document.getElementById('tbColHeader').textContent   = def ? def.label : 'Tiebreak';
+}
+
+// ═══════════════════════════════════════════════════
+//  PLAYERS
+// ═══════════════════════════════════════════════════
+function addPlayer() {
+  if (state.currentRound > 0) { showToast('Cannot add players after start'); return; }
+  const el   = document.getElementById('newPlayerName');
+  const name = el.value.trim();
+  if (!name) { showToast('Enter a name'); return; }
+  if (state.players.find(p => p.name.toLowerCase() === name.toLowerCase())) { showToast('Player already exists'); return; }
+  state.players.push({
+    id: Date.now() + Math.random(), name,
+    score: 0, wins: 0, draws: 0, losses: 0,
+    tiebreak: 0, whites: 0, blacks: 0, blackWins: 0,
+    opponents: [], opponentResults: [], cumulativeScores: [], byes: 0,
+  });
+  el.value = '';
+  saveState(); renderPlayerList(); renderRound(); renderStandings(); populateSwapSelects(); updateRoundsHint();
+  showToast(`${name} added`);
+}
+function removePlayer(id) {
+  if (state.currentRound > 0) { showToast('Cannot remove after start'); return; }
+  state.players = state.players.filter(p => p.id !== id);
+  saveState(); renderPlayerList(); renderRound(); renderStandings(); populateSwapSelects(); updateRoundsHint();
+}
+function renderPlayerList() {
+  const el = document.getElementById('playerList');
+  document.getElementById('playerCount').textContent = state.players.length;
+  if (!state.players.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-style:italic;font-size:13px;padding:6px 0">No players yet</div>';
+    return;
+  }
+  el.innerHTML = state.players.map(p => `
+    <div class="player-item">
+      <span class="pi-name">${esc(p.name)}</span>
+      <span class="pi-score">${fmtScore(p.score)}</span>
+      ${state.currentRound === 0
+        ? `<button class="pi-del" onclick="removePlayer(${p.id})" title="Remove">✕</button>` : ''}
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  TIEBREAK
+// ═══════════════════════════════════════════════════
+function recalcTiebreak() {
+  const method = state.meta.tiebreak || 'buchholz';
+  state.players.forEach(p => { p.tiebreak = calcTiebreakValue(p, method); });
+}
+function calcTiebreakValue(p, method) {
+  switch (method) {
+    case 'buchholz':
+      return p.opponents.reduce((s, oid) => { const o = getPlayer(oid); return s + (o ? o.score : 0); }, 0);
+    case 'buchholz-cut1': {
+      if (!p.opponents.length) return 0;
+      const scores = p.opponents.map(oid => { const o = getPlayer(oid); return o ? o.score : 0; });
+      return scores.reduce((a, b) => a + b, 0) - Math.min(...scores);
+    }
+    case 'sonneborn': {
+      let sb = 0;
+      p.opponents.forEach((oid, i) => {
+        const opp = getPlayer(oid); if (!opp) return;
+        const r = p.opponentResults[i];
+        if (r === 'w') sb += opp.score; else if (r === 'd') sb += opp.score / 2;
+      });
+      return sb;
+    }
+    case 'head-to-head': {
+      let h = 0;
+      p.opponents.forEach((oid, i) => {
+        const opp = getPlayer(oid); if (!opp || opp.score !== p.score) return;
+        const r = p.opponentResults[i];
+        if (r === 'w') h += 1; else if (r === 'd') h += 0.5;
+      });
+      return h;
+    }
+    case 'wins':       return p.wins;
+    case 'cumulative': return (p.cumulativeScores || []).reduce((a, b) => a + b, 0);
+    case 'black-wins': return p.blackWins || 0;
+    default:           return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  SWISS PAIRING ENGINE
+// ═══════════════════════════════════════════════════
+function generatePairings(players) {
+  const sorted = [...players].sort((a, b) => b.score - a.score || b.tiebreak - a.tiebreak || a.name.localeCompare(b.name));
+  let pool = [...sorted], byePlayer = null;
+  if (pool.length % 2 !== 0) {
+    for (let i = pool.length - 1; i >= 0; i--) {
+      if (pool[i].byes === 0) { byePlayer = pool.splice(i, 1)[0]; break; }
+    }
+    if (!byePlayer) byePlayer = pool.pop();
+  }
+  const paired = new Set(), pairings = [];
+  for (let i = 0; i < pool.length; i++) {
+    const a = pool[i]; if (paired.has(a.id)) continue;
+    let partner = null;
+    for (let j = i + 1; j < pool.length; j++) { const b = pool[j]; if (paired.has(b.id) || a.opponents.includes(b.id)) continue; partner = b; break; }
+    if (!partner) { for (let j = i + 1; j < pool.length; j++) { if (!paired.has(pool[j].id)) { partner = pool[j]; break; } } }
+    if (!partner) continue;
+    const aDiff = a.whites - a.blacks, bDiff = partner.whites - partner.blacks;
+    let white, black;
+    if      (aDiff > bDiff) { white = partner; black = a; }
+    else if (bDiff > aDiff) { white = a;       black = partner; }
+    else { white = Math.random() < 0.5 ? a : partner; black = white === a ? partner : a; }
+    pairings.push({ white: white.id, black: black.id, result: null });
+    paired.add(a.id); paired.add(partner.id);
+  }
+  if (byePlayer) pairings.push({ white: byePlayer.id, black: null, result: 'bye' });
+  // Assign table numbers by combined ranking of the pairing's players.
+  // Sort non-bye pairings: highest combined score → Table 1, etc.
+  // Tiebreaker: combined tiebreak, then alphabetical on white player name.
+  const nonBye = pairings.filter(p => p.result !== 'bye');
+  nonBye.sort((a, b) => {
+    const wa = getPlayer(a.white), ba2 = getPlayer(a.black);
+    const wb = getPlayer(b.white), bb2 = getPlayer(b.black);
+    const scoreA = (wa ? wa.score : 0) + (ba2 ? ba2.score : 0);
+    const scoreB = (wb ? wb.score : 0) + (bb2 ? bb2.score : 0);
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    const tbA = (wa ? wa.tiebreak : 0) + (ba2 ? ba2.tiebreak : 0);
+    const tbB = (wb ? wb.tiebreak : 0) + (bb2 ? bb2.tiebreak : 0);
+    if (tbB !== tbA) return tbB - tbA;
+    const winsA = (wa ? wa.wins : 0) + (ba2 ? ba2.wins : 0);
+    const winsB = (wb ? wb.wins : 0) + (bb2 ? bb2.wins : 0);
+    if (winsB !== winsA) return winsB - winsA;
+    const nameA = wa ? wa.name : '';
+    const nameB = wb ? wb.name : '';
+    return nameA.localeCompare(nameB);
+  });
+  nonBye.forEach((p, idx) => { p.tableNumber = idx + 1; });
+  return pairings;
+}
+
+// ═══════════════════════════════════════════════════
+//  ROUNDS
+// ═══════════════════════════════════════════════════
+function startRound() {
+  if (state.players.length < 2)                  { showToast('Need at least 2 players'); return; }
+  if (state.meta.ended)                          { showToast('Tournament has ended'); return; }
+  if (state.currentRound >= getEffectiveRounds()) { showToast('All rounds done'); return; }
+  if (state.rounds.length > 0 && !isRoundComplete(state.rounds[state.rounds.length - 1])) { showToast('Complete current round first'); return; }
+  state.currentRound++;
+  const pairings = generatePairings(state.players);
+  pairings.forEach(p => {
+    if (p.result === 'bye') {
+      const bp = getPlayer(p.white);
+      if (bp) { bp.score += 1; bp.byes++; }
+    }
+  });
+  state.rounds.push({ number: state.currentRound, pairings, locked: false });
+  recalcTiebreak(); playSound('roundStart'); saveState();
+  renderRound(); renderStandings(); renderPlayerList(); populateSwapSelects();
+  showToast(`Round ${state.currentRound} started`);
+}
+function nextRound() { startRound(); }
+function endTournament() {
+  if (!confirm('End the tournament and lock final standings?')) return;
+  state.meta.ended = true; saveState(); renderRound(); showToast('Tournament ended');
+}
+function isRoundComplete(round) { return round.pairings.every(p => p.result !== null); }
+function checkAutoLock(round) {
+  if (!round.locked && isRoundComplete(round)) {
+    round.locked = true;
+    state.players.forEach(p => recordCumulative(p));
+    recalcTiebreak(); saveState(); renderRound(); renderStandings();
+    showToast(`Round ${round.number} locked`);
+  }
+}
+function recordCumulative(p) { if (!p.cumulativeScores) p.cumulativeScores = []; p.cumulativeScores.push(p.score); }
+
+// ═══════════════════════════════════════════════════
+//  RESULTS
+// ═══════════════════════════════════════════════════
+// ── Result editing ──────────────────────────────────────────────────────────
+// setResult and undoResult now work on ANY round index, including locked
+// prior rounds.  When editing a prior round we call rebuildPlayerStats()
+// to recompute everything from scratch, keeping Buchholz/Swiss correct.
+
+function setResult(roundIdx, pairingIdx, result) {
+  const round = state.rounds[roundIdx];
+  if (!round) return;
+  const pairing = round.pairings[pairingIdx];
+  if (!pairing || pairing.result === 'bye') return;
+
+  const isPrior = roundIdx < state.rounds.length - 1;
+
+  if (isPrior) {
+    // Write corrected result
+    pairing.result = result;
+    // Rebuild all player stats from scratch so scores/tiebreaks are clean
+    rebuildPlayerStats();
+    recalcTiebreak();
+    // Invalidate every round after the edited one and regenerate the next round
+    invalidateAndRegenFrom(roundIdx + 1);
+    saveState(); renderRound(); renderStandings(); renderPlayerList();
+    showToast(`Round ${round.number} updated — Round ${roundIdx + 2} repaired`);
+    return;
+  }
+
+  // Current (last) round — original incremental logic, unchanged
+  if (round.locked) return;
+  if (pairing.result && pairing.result !== 'bye') { revertResult(pairing); pairing.result = null; }
+  const w = getPlayer(pairing.white), b = getPlayer(pairing.black); if (!w || !b) return;
+  if (!w.opponents.includes(b.id)) {
+    w.opponents.push(b.id); b.opponents.push(w.id);
+    w.whites++; b.blacks++;
+    if (!w.opponentResults) w.opponentResults = [];
+    if (!b.opponentResults) b.opponentResults = [];
+    w.opponentResults.push(null); b.opponentResults.push(null);
+  }
+  pairing.result = result;
+  const wIdx = w.opponents.indexOf(b.id), bIdx = b.opponents.indexOf(w.id);
+  if      (result === 'white') { w.score += 1; w.wins++;  b.losses++; w.opponentResults[wIdx] = 'w'; b.opponentResults[bIdx] = 'l'; }
+  else if (result === 'black') { b.score += 1; b.wins++;  w.losses++; b.opponentResults[bIdx] = 'w'; w.opponentResults[wIdx] = 'l'; b.blackWins = (b.blackWins||0)+1; }
+  else if (result === 'draw')  { w.score += 0.5; w.draws++; b.score += 0.5; b.draws++; w.opponentResults[wIdx] = 'd'; b.opponentResults[bIdx] = 'd'; }
+  checkAutoLock(round); recalcTiebreak(); saveState(); renderRound(); renderStandings(); renderPlayerList();
+}
+
+function undoResult(roundIdx, pairingIdx) {
+  const round = state.rounds[roundIdx];
+  if (!round) return;
+  const pairing = round.pairings[pairingIdx];
+  if (!pairing || !pairing.result || pairing.result === 'bye') return;
+
+  const isPrior = roundIdx < state.rounds.length - 1;
+
+  if (isPrior) {
+    pairing.result = null;
+    rebuildPlayerStats();
+    recalcTiebreak();
+    invalidateAndRegenFrom(roundIdx + 1);
+    saveState(); renderRound(); renderStandings(); renderPlayerList();
+    showToast(`Round ${round.number} cleared — Round ${roundIdx + 2} repaired`);
+    return;
+  }
+
+  // Current round — original logic
+  if (round.locked) return;
+  revertResult(pairing); pairing.result = null;
+  recalcTiebreak(); saveState(); renderRound(); renderStandings(); renderPlayerList();
+}
+
+function revertResult(pairing) {
+  const w = getPlayer(pairing.white), b = getPlayer(pairing.black); if (!w || !b) return;
+  const wIdx = w.opponents.indexOf(b.id), bIdx = b.opponents.indexOf(w.id);
+  if (wIdx !== -1 && w.opponentResults) w.opponentResults.splice(wIdx, 1);
+  if (bIdx !== -1 && b.opponentResults) b.opponentResults.splice(bIdx, 1);
+  w.opponents = w.opponents.filter(id => id !== b.id);
+  b.opponents = b.opponents.filter(id => id !== w.id);
+  w.whites = Math.max(0, w.whites - 1); b.blacks = Math.max(0, b.blacks - 1);
+  const r = pairing.result;
+  if      (r === 'white') { w.score -= 1; w.wins--;  b.losses--; }
+  else if (r === 'black') { b.score -= 1; b.wins--;  w.losses--; b.blackWins = Math.max(0,(b.blackWins||1)-1); }
+  else if (r === 'draw')  { w.score -= 0.5; w.draws--; b.score -= 0.5; b.draws--; }
+}
+
+// ── rebuildPlayerStats ───────────────────────────────────────────────────────
+// Resets all derived player fields to zero, then replays every pairing
+// in every round in order.  This is the only correct way to handle
+// retroactive result changes while keeping Buchholz and cumulative scores right.
+function rebuildPlayerStats() {
+  // Reset all players
+  state.players.forEach(p => {
+    p.score = 0; p.wins = 0; p.draws = 0; p.losses = 0;
+    p.whites = 0; p.blacks = 0; p.blackWins = 0; p.byes = 0;
+    p.opponents = []; p.opponentResults = []; p.cumulativeScores = [];
+  });
+
+  state.rounds.forEach(round => {
+    round.pairings.forEach(pairing => {
+      if (pairing.result === 'bye') {
+        const bp = getPlayer(pairing.white);
+        if (bp) { bp.score += 1; bp.byes++; }
+        return;
+      }
+      if (!pairing.result) return; // no result yet — skip
+
+      const w = getPlayer(pairing.white), b = getPlayer(pairing.black);
+      if (!w || !b) return;
+
+      // Record opponent relationship and color
+      w.opponents.push(b.id); b.opponents.push(w.id);
+      w.whites++; b.blacks++;
+
+      const r = pairing.result;
+      if (r === 'white') {
+        w.score += 1; w.wins++; b.losses++;
+        w.opponentResults.push('w'); b.opponentResults.push('l');
+      } else if (r === 'black') {
+        b.score += 1; b.wins++; w.losses++;
+        b.opponentResults.push('w'); w.opponentResults.push('l');
+        b.blackWins = (b.blackWins || 0) + 1;
+      } else if (r === 'draw') {
+        w.score += 0.5; w.draws++;
+        b.score += 0.5; b.draws++;
+        w.opponentResults.push('d'); b.opponentResults.push('d');
+      }
+    });
+
+    // Record cumulative score snapshot at end of each round
+    // Only for rounds that are fully complete (locked or all results in)
+    if (isRoundComplete(round)) {
+      state.players.forEach(p => {
+        if (!p.cumulativeScores) p.cumulativeScores = [];
+        p.cumulativeScores.push(p.score);
+      });
+    }
+  });
+}
+
+// ── invalidateAndRegenFrom ───────────────────────────────────────────────────
+// Deletes all rounds from targetRoundIdx onward, then re-runs Swiss pairing
+// for that round using the current (rebuilt) player stats.
+// Called after editing a prior-round result.
+function invalidateAndRegenFrom(targetRoundIdx) {
+  try {
+    if (targetRoundIdx < 0 || targetRoundIdx >= state.rounds.length) return;
+    const roundsToRebuild = state.rounds.length - targetRoundIdx;
+    // Remove all rounds from targetRoundIdx onward
+    state.rounds.splice(targetRoundIdx);
+    state.currentRound = targetRoundIdx;
+    // Regenerate the removed round span so bracket progression is preserved.
+    for (let i = 0; i < roundsToRebuild; i++) {
+      const roundNumber = targetRoundIdx + 1 + i;
+      const newPairings = generatePairings(state.players);
+      // Apply BYE scores immediately (mirrors startRound logic)
+      newPairings.forEach(p => {
+        if (p.result === 'bye') {
+          const bp = getPlayer(p.white);
+          if (bp) { bp.score += 1; bp.byes++; }
+        }
+      });
+      state.rounds.push({ number: roundNumber, pairings: newPairings, locked: false });
+      state.currentRound = roundNumber;
+    }
+    // Recalc tiebreak once more now that BYE scores are in
+    recalcTiebreak();
+  } catch(e) { /* fail silently */ }
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER PAIRINGS
+// ═══════════════════════════════════════════════════
+function renderRound() {
+  const emptyEl  = document.getElementById('pairingsEmpty');
+  const container= document.getElementById('roundContainer');
+  const btnStart = document.getElementById('btnStart');
+  const btnNext  = document.getElementById('btnNext');
+  const btnEnd   = document.getElementById('btnEnd');
+  const rtitle   = document.getElementById('roundTitle');
+  const rstatus  = document.getElementById('roundStatus');
+  const grid     = document.getElementById('pairingsGrid');
+  const total    = getEffectiveRounds();
+  if (state.players.length < 2) { emptyEl.style.display = ''; container.style.display = 'none'; return; }
+  emptyEl.style.display = 'none'; container.style.display = '';
+  if (state.rounds.length === 0) {
+    rtitle.textContent = 'Round 1'; rstatus.textContent = 'Not started';
+    btnStart.style.display = ''; btnStart.textContent = `▶ Start Round 1 of ${total}`;
+    btnNext.style.display = 'none'; btnEnd.style.display = 'none';
+    grid.innerHTML = ''; return;
+  }
+  const round    = state.rounds[state.rounds.length - 1];
+  const roundIdx = state.rounds.length - 1;
+  const complete = isRoundComplete(round);
+  const ended    = state.meta.ended;
+  const hitLimit = state.currentRound >= total;
+  rtitle.textContent  = `Round ${round.number} of ${total}`;
+  rstatus.textContent = round.locked ? 'Locked ✓' : complete ? 'Complete' : 'In progress';
+  btnStart.style.display = 'none';
+  if (ended || (hitLimit && complete)) {
+    rstatus.textContent = 'Tournament Complete 🏆';
+    btnNext.style.display = 'none'; btnEnd.style.display = 'none';
+  } else if (complete) {
+    btnNext.style.display = ''; btnNext.textContent = `Next Round (${state.currentRound + 1}/${total}) →`;
+    btnEnd.style.display = '';
+  } else { btnNext.style.display = 'none'; btnEnd.style.display = 'none'; }
+  grid.innerHTML = round.pairings.map((p, i) => {
+    if (p.result === 'bye') {
+      const bp = getPlayer(p.white);
+      return `<div class="pairing-card bye-card result-set">
+        <div class="player-slot"><div class="color-label white">BYE</div>
+        <div class="pname">${bp ? esc(bp.name) : '?'}</div><div class="pscore">+1 point</div></div>
+        <div class="locked-badge">BYE</div></div>`;
+    }
+    const w = getPlayer(p.white), b = getPlayer(p.black); if (!w || !b) return '';
+    const locked = round.locked, hasResult = p.result !== null;
+    return `<div class="pairing-card ${locked?'locked':''} ${hasResult?'result-set':''}">
+      ${p.tableNumber != null ? `<div class="pair-table-badge">Table ${p.tableNumber}</div>` : ''}
+      <div class="player-slot"><div class="color-label white">⬜ White</div>
+        <div class="pname">${esc(w.name)}</div><div class="pscore">${fmtScore(w.score)} pts</div></div>
+      <div class="vs-sep">vs</div>
+      <div class="player-slot" style="text-align:right"><div class="color-label black" style="text-align:right">⬛ Black</div>
+        <div class="pname">${esc(b.name)}</div><div class="pscore">${fmtScore(b.score)} pts</div></div>
+      <div class="result-btns">
+        ${locked ? `<div class="locked-badge">${resultLabel(p.result)}</div>`
+          : `<button class="res-btn white-win ${p.result==='white'?'active':''}" onclick="setResult(${roundIdx},${i},'white')">White wins</button>
+             <button class="res-btn draw      ${p.result==='draw' ?'active':''}" onclick="setResult(${roundIdx},${i},'draw')">Draw</button>
+             <button class="res-btn black-win ${p.result==='black'?'active':''}" onclick="setResult(${roundIdx},${i},'black')">Black wins</button>
+             ${hasResult ? `<button class="res-btn" onclick="undoResult(${roundIdx},${i})" style="color:var(--red);border-color:var(--red)">↺ Undo</button>` : ''}`}
+      </div></div>`;
+  }).join('');
+  renderRoundsTab();
+}
+function resultLabel(r) { return r==='white'?'⬜ White won':r==='black'?'⬛ Black won':r==='draw'?'½–½ Draw':''; }
+
+// ═══════════════════════════════════════════════════
+//  PRIOR ROUNDS (editable)
+// ═══════════════════════════════════════════════════
+function renderPriorRounds() {
+  // Remove existing prior-rounds section if present
+  const existing = document.getElementById('priorRoundsSection');
+  if (existing) existing.remove();
+
+  // Only show if there are at least 2 rounds (i.e. a prior round exists)
+  if (state.rounds.length < 2) return;
+
+  const container = document.getElementById('roundContainer');
+  if (!container) return;
+
+  const priorRounds = state.rounds.slice(0, state.rounds.length - 1);
+
+  const section = document.createElement('div');
+  section.id = 'priorRoundsSection';
+  section.className = 'prior-rounds';
+
+  section.innerHTML = `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--text-muted);margin-bottom:14px;padding-top:4px;border-top:1px solid var(--border)">
+      Prior Rounds — Click any result to change it
+    </div>
+    ${priorRounds.map((round, ri) => renderPriorRoundHTML(round, ri)).join('')}
+  `;
+
+  container.appendChild(section);
+}
+
+function renderPriorRoundHTML(round, roundIdx) {
+  const complete = isRoundComplete(round);
+  return `<div class="prior-round-section">
+    <div class="prior-round-hd">
+      <span class="prior-round-title">Round ${round.number}</span>
+      <span class="prior-round-badge">${complete ? 'Complete' : 'Incomplete'}</span>
+      <span class="prior-edit-note">editing recalculates all scores &amp; tiebreaks</span>
+    </div>
+    <div class="pairings-grid">
+      ${round.pairings.map((p, pi) => {
+        if (p.result === 'bye') {
+          const bp = getPlayer(p.white);
+          return `<div class="pairing-card bye-card result-set prior">
+            <div class="player-slot"><div class="color-label white">BYE</div>
+              <div class="pname">${bp ? esc(bp.name) : '?'}</div></div>
+            <div class="locked-badge">BYE</div></div>`;
+        }
+        const w = getPlayer(p.white), b = getPlayer(p.black);
+        if (!w || !b) return '';
+        const hasResult = p.result !== null;
+        return `<div class="pairing-card prior ${hasResult ? 'result-set' : ''}">
+          ${p.tableNumber != null ? `<div class="pair-table-badge">Table ${p.tableNumber}</div>` : ''}
+          <div class="player-slot">
+            <div class="color-label white">⬜ White</div>
+            <div class="pname">${esc(w.name)}</div>
+            <div class="pscore">${fmtScore(w.score)} pts</div>
+          </div>
+          <div class="vs-sep">vs</div>
+          <div class="player-slot" style="text-align:right">
+            <div class="color-label black" style="text-align:right">⬛ Black</div>
+            <div class="pname">${esc(b.name)}</div>
+            <div class="pscore">${fmtScore(b.score)} pts</div>
+          </div>
+          <div class="result-btns">
+            <button class="res-btn white-win ${p.result==='white'?'active':''}" onclick="setResult(${roundIdx},${pi},'white')">White wins</button>
+            <button class="res-btn draw      ${p.result==='draw' ?'active':''}" onclick="setResult(${roundIdx},${pi},'draw')">Draw</button>
+            <button class="res-btn black-win ${p.result==='black'?'active':''}" onclick="setResult(${roundIdx},${pi},'black')">Black wins</button>
+            ${hasResult ? `<button class="res-btn" onclick="undoResult(${roundIdx},${pi})" style="color:var(--red);border-color:var(--red)">↺ Clear</button>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  STANDINGS
+// ═══════════════════════════════════════════════════
+function renderStandings() {
+  updateTiebreakUI();
+  const sorted = getSortedPlayers();
+  const tb     = state.meta.tiebreak || 'buchholz';
+  const tableMap = getCurrentTableMap();
+  document.getElementById('standingsBody').innerHTML = sorted.map((p, i) => {
+    const rc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const tableVal = tableMap.has(p.id) ? tableMap.get(p.id) : '—';
+    const tableCls = tableVal === 'BYE' ? 'table-chip bye' : 'table-chip';
+    const tableTxt = tableVal === '—' ? '—' : tableVal === 'BYE' ? 'BYE' : `T${tableVal}`;
+    return `<tr class="${i===0&&sorted.length>1?'leader':''}">
+      <td><span class="rank-badge ${rc}">${i+1}</span></td>
+      <td>${esc(p.name)}</td>
+      <td class="score-cell">${fmtScore(p.score)}</td>
+      <td class="tb-cell">${formatTiebreakVal(p.tiebreak, tb)}</td>
+      <td class="table-cell"><span class="${tableCls}">${tableTxt}</span></td>
+      <td class="stat-cell" style="color:var(--green)">${p.wins}</td>
+      <td class="stat-cell" style="color:var(--blue)">${p.draws}</td>
+      <td class="stat-cell" style="color:var(--red)">${p.losses}</td>
+      <td class="stat-cell">${p.whites}</td><td class="stat-cell">${p.blacks}</td><td class="stat-cell">${p.byes}</td>
+    </tr>`;
+  }).join('');
+}
+function getCompleteRounds() {
+  return state.rounds.filter(r => isRoundComplete(r));
+}
+function navigateRounds(delta) {
+  const completed = getCompleteRounds();
+  if (!completed.length) return;
+  const idx = completed.findIndex(r => r.number === selectedRoundViewNumber);
+  const current = idx === -1 ? completed.length - 1 : idx;
+  const next = Math.max(0, Math.min(completed.length - 1, current + delta));
+  selectedRoundViewNumber = completed[next].number;
+  renderRoundsTab();
+}
+function onRoundPickerChange() {
+  const v = parseInt(document.getElementById('roundPicker').value, 10);
+  selectedRoundViewNumber = Number.isFinite(v) ? v : null;
+  renderRoundsTab();
+}
+function renderRoundsTab() {
+  const picker = document.getElementById('roundPicker');
+  const body   = document.getElementById('roundsViewBody');
+  const meta   = document.getElementById('roundViewMeta');
+  const btnPrev= document.getElementById('btnPrevRoundView');
+  const btnNext= document.getElementById('btnNextRoundView');
+  if (!picker || !body || !meta || !btnPrev || !btnNext) return;
+
+  const completed = getCompleteRounds();
+  if (!completed.length) {
+    picker.innerHTML = '<option value="">No completed rounds yet</option>';
+    picker.value = '';
+    body.innerHTML = '<div class="rounds-empty">Complete a round to browse it here.</div>';
+    meta.textContent = '';
+    btnPrev.disabled = true;
+    btnNext.disabled = true;
+    return;
+  }
+
+  if (!completed.some(r => r.number === selectedRoundViewNumber)) {
+    selectedRoundViewNumber = completed[completed.length - 1].number;
+  }
+  const idx = completed.findIndex(r => r.number === selectedRoundViewNumber);
+  const round = completed[idx];
+  const roundIdx = state.rounds.findIndex(r => r.number === round.number);
+
+  picker.innerHTML = completed.map(r => `<option value="${r.number}">Round ${r.number}</option>`).join('');
+  picker.value = String(round.number);
+  btnPrev.disabled = idx <= 0;
+  btnNext.disabled = idx >= completed.length - 1;
+  meta.textContent = `${idx + 1} of ${completed.length} completed rounds`;
+
+  body.innerHTML = round.pairings.map((p, pairingIdx) => {
+    if (p.result === 'bye') {
+      const bp = getPlayer(p.white);
+      return `<div class="pairing-card bye-card result-set">
+        <div class="player-slot"><div class="color-label white">BYE</div>
+        <div class="pname">${bp ? esc(bp.name) : '?'}</div><div class="pscore">+1 point</div></div>
+        <div class="locked-badge">BYE</div></div>`;
+    }
+    const w = getPlayer(p.white), b = getPlayer(p.black);
+    if (!w || !b) return '';
+    const hasResult = p.result !== null;
+    return `<div class="pairing-card result-set">
+      ${p.tableNumber != null ? `<div class="pair-table-badge">Table ${p.tableNumber}</div>` : ''}
+      <div class="player-slot"><div class="color-label white">⬜ White</div>
+        <div class="pname">${esc(w.name)}</div><div class="pscore">${fmtScore(w.score)} pts</div></div>
+      <div class="vs-sep">vs</div>
+      <div class="player-slot" style="text-align:right"><div class="color-label black" style="text-align:right">⬛ Black</div>
+        <div class="pname">${esc(b.name)}</div><div class="pscore">${fmtScore(b.score)} pts</div></div>
+      <div class="result-btns">
+        <button class="res-btn white-win ${p.result==='white'?'active':''}" onclick="setResult(${roundIdx},${pairingIdx},'white')">White wins</button>
+        <button class="res-btn draw      ${p.result==='draw' ?'active':''}" onclick="setResult(${roundIdx},${pairingIdx},'draw')">Draw</button>
+        <button class="res-btn black-win ${p.result==='black'?'active':''}" onclick="setResult(${roundIdx},${pairingIdx},'black')">Black wins</button>
+        ${hasResult ? `<button class="res-btn" onclick="undoResult(${roundIdx},${pairingIdx})" style="color:var(--red);border-color:var(--red)">↺ Clear</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function getCurrentTableMap() {
+  const out = new Map();
+  const round = state.rounds[state.rounds.length - 1];
+  if (!round) return out;
+  round.pairings.forEach(p => {
+    if (p.result === 'bye') { out.set(p.white, 'BYE'); return; }
+    const table = p.tableNumber != null ? String(p.tableNumber) : '—';
+    out.set(p.white, table);
+    if (p.black != null) out.set(p.black, table);
+  });
+  return out;
+}
+function getSortedPlayers() {
+  return [...state.players].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.tiebreak !== a.tiebreak) return b.tiebreak - a.tiebreak;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return a.name.localeCompare(b.name);
+  });
+}
+function formatTiebreakVal(val, method) {
+  if (val === undefined || val === null) return '—';
+  if (method === 'wins' || method === 'black-wins') return String(val);
+  return Number.isInteger(val) ? String(val) : val.toFixed(1);
+}
+
+// ═══════════════════════════════════════════════════
+//  SWAP
+// ═══════════════════════════════════════════════════
+function doSwap() {
+  const round = state.rounds[state.rounds.length - 1];
+  if (!round || round.locked) { showToast('No active unlocked round'); return; }
+  if (round.pairings.some(p => p.result && p.result !== 'bye')) { showToast('Cannot swap after results entered'); return; }
+  const aId = parseFloat(document.getElementById('swapA').value);
+  const bId = parseFloat(document.getElementById('swapB').value);
+  if (!aId || !bId || aId === bId) { showToast('Select two different players'); return; }
+  let aP=null, bP=null, aRole=null, bRole=null;
+  round.pairings.forEach(p => {
+    if (p.white===aId){aP=p;aRole='white';} if (p.black===aId){aP=p;aRole='black';}
+    if (p.white===bId){bP=p;bRole='white';} if (p.black===bId){bP=p;bRole='black';}
+  });
+  if (!aP || !bP) { showToast('Players not in current pairings'); return; }
+  if (aP === bP) { [aP.white, aP.black] = [aP.black, aP.white]; }
+  else { if (aRole==='white') aP.white=bId; else aP.black=bId; if (bRole==='white') bP.white=aId; else bP.black=aId; }
+  saveState(); renderRound(); showToast('Swapped');
+}
+function populateSwapSelects() {
+  const round = state.rounds[state.rounds.length - 1];
+  const ids   = round ? round.pairings.flatMap(p => [p.white, p.black].filter(Boolean)) : [];
+  ['swapA','swapB'].forEach(elId => {
+    document.getElementById(elId).innerHTML = '<option value="">Select…</option>' +
+      ids.map(id => { const pl = getPlayer(id); return pl ? `<option value="${pl.id}">${esc(pl.name)}</option>` : ''; }).join('');
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  ROUND TIMER (existing, unchanged)
+// ═══════════════════════════════════════════════════
+function tickTimer() {
+  const t = state.timer; const el = document.getElementById('timerDisplay');
+  let remaining;
+  if (t.running && t.startTime) { remaining = Math.max(0, t.duration - (Date.now() - t.startTime) / 1000); }
+  else { remaining = t.remaining; }
+  if (!t.running && remaining >= t.duration) { el.textContent = '--:--'; el.className = 'timer-display'; return; }
+  const m = Math.floor(remaining / 60), s = Math.floor(remaining % 60);
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.className   = 'timer-display' + (remaining<=0?' expired':remaining<300?' warning':'');
+}
+function timerStart() {
+  if (state.timer.running) return;
+  state.timer.startTime = Date.now() - (state.timer.duration - state.timer.remaining) * 1000;
+  state.timer.running = true; saveState();
+}
+function timerPause() {
+  if (!state.timer.running) return;
+  state.timer.remaining = Math.max(0, state.timer.duration - (Date.now() - state.timer.startTime) / 1000);
+  state.timer.running = false; state.timer.startTime = null; saveState();
+}
+function timerReset() {
+  const mins = parseInt(document.getElementById('timerMins').value) || 60;
+  Object.assign(state.timer, { duration: mins*60, remaining: mins*60, startTime: null, running: false }); saveState();
+}
+function applyTimer() {
+  const mins = parseInt(document.getElementById('timerMins').value) || 60;
+  Object.assign(state.timer, { duration: mins*60, remaining: mins*60, startTime: null, running: false });
+  saveState(); showToast(`Timer set to ${mins} min`);
+}
+
+// ═══════════════════════════════════════════════════
+//  CSV
+// ═══════════════════════════════════════════════════
+function exportCSV() {
+  const sorted  = getSortedPlayers();
+  const tbLabel = TIEBREAK_DEFS[state.meta.tiebreak || 'buchholz']?.label || 'Tiebreak';
+  const rows    = [['Rank','Name','Score',tbLabel,'W','D','L','Whites','Blacks','BYEs']];
+  sorted.forEach((p,i) => rows.push([i+1, p.name, p.score, formatTiebreakVal(p.tiebreak, state.meta.tiebreak), p.wins, p.draws, p.losses, p.whites, p.blacks, p.byes]));
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a   = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], {type:'text/csv'})), download: `${(state.meta.name||'tournament').replace(/\s+/g,'_')}_standings.csv` });
+  a.click(); showToast('CSV exported');
+}
+
+// ═══════════════════════════════════════════════════
+//  RESET / PODIUM / DISPLAY
+// ═══════════════════════════════════════════════════
+function fullReset() {
+  if (!confirm('Reset everything? This cannot be undone.')) return;
+  state = defaultState(); saveState(); init(); showToast('Tournament reset');
+}
+function triggerPodium() {
+  state.meta.podiumTopN = getPodiumTopN();
+  state.podium = true;
+  state.meta.podiumPermanent = true;
+  saveState(); openDisplay(); showToast(`Top ${state.meta.podiumTopN} podium shown on display`);
+}
+function dismissPodium() {
+  if (!confirm('Hide the podium on the display screen?')) return;
+  state.podium = false;
+  state.meta.podiumPermanent = false;
+  saveState(); showToast('Podium dismissed');
+}
+function openDisplay() { window.open('tournament-display.html', '_blank'); }
+
+// ═══════════════════════════════════════════════════
+//  TABS / SOUND / HELPERS
+// ═══════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination); osc.type = 'sine';
+    if (type === 'roundStart') {
+      [523,659,784].forEach((f,i) => osc.frequency.setValueAtTime(f, ctx.currentTime+i*0.14));
+      gain.gain.setValueAtTime(0.1, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.55);
+      osc.start(); osc.stop(ctx.currentTime+0.55);
+    }
+  } catch(e) {}
+}
+function updateStatusBar() {
+  const total  = getEffectiveRounds();
+  const status = state.meta.ended ? 'Ended' : `Round ${state.currentRound}/${total}`;
+  document.getElementById('statusInfo').textContent = `${state.players.length} players · ${status} · ${new Date().toLocaleTimeString()}`;
+  const dismissBtn = document.getElementById('btnDismissPodium');
+  if (dismissBtn) dismissBtn.style.display = state.meta.podiumPermanent ? '' : 'none';
+}
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+function getPlayer(id) { return state.players.find(p => p.id === id) || null; }
+function fmtScore(s)   { return Number.isInteger(s) ? String(s) : s.toFixed(1); }
+function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escJsStr(str) {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/</g, '\\x3C');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  CHESS CLOCKS MODULE
+//  Completely self-contained.  Reads/writes no tournament state.
+//  All communication goes through the socket.  All rendering is local to this
+//  section.  The only external call is showToast().
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CK = (() => {
+  // ── State ────────────────────────────────────────────────────────────────────
+  // boardId → BoardState (as received from server)
+  const boardMap   = new Map();
+  let selectedBoard = null;   // currently focused boardId
+  let rafId         = null;   // requestAnimationFrame handle
+
+  // ── Socket setup ─────────────────────────────────────────────────────────────
+  let socket = null;
+
+  function connect() {
+    // socket.io CDN loaded via <script src="/socket.io/socket.io.js">
+    // If server is offline the script tag simply 404s; io will be undefined.
+    if (typeof io === 'undefined') {
+      setConnStatus('error', 'Server offline — start node server.js');
+      return;
+    }
+
+    socket = io({ reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
+
+    socket.on('connect', () => {
+      setConnStatus('connected', `Connected · ${socket.id.slice(0,8)}`);
+    });
+
+    socket.on('disconnect', () => {
+      setConnStatus('error', 'Disconnected — reconnecting…');
+    });
+
+    socket.on('connect_error', () => {
+      setConnStatus('error', 'Cannot reach server — is it running?');
+    });
+
+    // Full snapshot on connect / reconnect
+    socket.on('clock:fullSync', (allBoards) => {
+      boardMap.clear();
+      Object.values(allBoards).forEach(b => boardMap.set(b.boardId, b));
+      renderBoardSelector();
+      renderBoardList();
+      if (selectedBoard && !boardMap.has(selectedBoard)) selectedBoard = null;
+      renderDetail();
+    });
+
+    // Single-board update after any mutation
+    socket.on('clock:state', (board) => {
+      boardMap.set(board.boardId, board);
+      renderBoardSelector();
+      renderBoardList();
+      if (selectedBoard === board.boardId) renderDetail();
+    });
+
+    socket.on('clock:error', ({ boardId, message }) => {
+      showToast(`Clock error (${boardId}): ${message}`);
+    });
+  }
+
+  // ── Emit helpers ─────────────────────────────────────────────────────────────
+  function emit(event, data) {
+    if (!socket || !socket.connected) { showToast('Not connected to clock server'); return false; }
+    socket.emit(event, data);
+    return true;
+  }
+
+  // ── Public API (called from onclick in HTML) ──────────────────────────────────
+  function configure() {
+    const boardId       = document.getElementById('ckBoardId').value.trim();
+    const baseTimeSecs  = parseFloat(document.getElementById('ckBaseTime').value)  || 300;
+    const incrementSecs = parseFloat(document.getElementById('ckIncrement').value) || 0;
+    if (!boardId) { showToast('Enter a board ID'); return; }
+    emit('clock:configure', { boardId, baseTimeSecs, incrementSecs });
+    selectedBoard = boardId;
+  }
+  function start()  { if (selectedBoard) emit('clock:start',  { boardId: selectedBoard }); }
+  function pause()  { if (selectedBoard) emit('clock:pause',  { boardId: selectedBoard }); }
+  function move()   { if (selectedBoard) emit('clock:move',   { boardId: selectedBoard }); }
+  function reset()  { if (selectedBoard) emit('clock:reset',  { boardId: selectedBoard }); }
+  function select(boardId) { selectedBoard = boardId; renderDetail(); }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────────
+
+  function setConnStatus(type, label) {
+    const el  = document.getElementById('ckConn');
+    const lbl = document.getElementById('ckConnLabel');
+    el.className  = `ck-conn ${type}`;
+    lbl.textContent = label;
+  }
+
+  function renderBoardSelector() {
+    const el = document.getElementById('ckBoards');
+    if (boardMap.size === 0) {
+      el.innerHTML = '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--text-muted);line-height:28px">No boards yet →</span>';
+      return;
+    }
+    el.innerHTML = [...boardMap.values()].map(b => {
+      const extra = b.status === 'running' ? 'running' : b.status === 'finished' ? 'finished' : '';
+      const active = selectedBoard === b.boardId ? 'active' : '';
+      return `<button class="ck-board-btn ${active} ${extra}" onclick="CK.select('${escJsStr(b.boardId)}')">${esc(b.boardId)}</button>`;
+    }).join('');
+  }
+
+  function renderBoardList() {
+    const el = document.getElementById('ckBoardList');
+    if (boardMap.size === 0) { el.innerHTML = '<div class="ck-empty">No boards yet</div>'; return; }
+    el.innerHTML = [...boardMap.values()].map(b => {
+      const ws = liveRemaining(b, 'white'), bs = liveRemaining(b, 'black');
+      const wLow = ws < 30000 ? 'low' : '', bLow = bs < 30000 ? 'low' : '';
+      const sel  = selectedBoard === b.boardId ? 'selected' : '';
+      return `<div class="ck-board-row ${sel}" onclick="CK.select('${escJsStr(b.boardId)}')">
+        <span class="ck-board-id">${esc(b.boardId)}</span>
+        <span class="ck-board-names">⬜ ${fmtMs(ws)} · ⬛ ${fmtMs(bs)}</span>
+        <span class="ck-board-wt ${wLow}">${fmtMs(ws)}</span>
+        <span class="ck-board-bt ${bLow}">${fmtMs(bs)}</span>
+        <span class="ck-board-st ${b.status}">${b.status}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function renderDetail() {
+    const el = document.getElementById('ckDetail');
+    if (!selectedBoard || !boardMap.has(selectedBoard)) {
+      el.innerHTML = '<div class="ck-empty">Select or create a board to control clocks.</div>';
+      return;
+    }
+    const b        = boardMap.get(selectedBoard);
+    const running  = b.status === 'running';
+    const paused   = b.status === 'paused';
+    const idle     = b.status === 'idle';
+    const finished = b.status === 'finished';
+    const canMove  = running;
+    const canStart = !running && !finished;
+    const canPause = running;
+    const incLabel = b.increment > 0 ? `+${b.increment/1000}s` : 'no increment';
+
+    el.innerHTML = `
+      <div class="ck-clocks" id="ckFaces">
+        <div class="ck-face ${b.activePlayer==='white'&&running?'active-clock':''}" id="ckFaceW">
+          <div class="ck-face-label">⬜ White</div>
+          <div class="ck-time" id="ckTimeW">${fmtMs(b.whiteTimeRemaining)}</div>
+          <div class="ck-inc">${incLabel}</div>
+        </div>
+        <div class="ck-face ${b.activePlayer==='black'&&running?'active-clock':''}" id="ckFaceB">
+          <div class="ck-face-label">⬛ Black</div>
+          <div class="ck-time" id="ckTimeB">${fmtMs(b.blackTimeRemaining)}</div>
+          <div class="ck-inc">${incLabel}</div>
+        </div>
+      </div>
+
+      <div class="ck-controls">
+        <button class="btn success" onclick="CK.start()" ${canStart?'':'disabled'}>▶ Start</button>
+        <button class="btn"         onclick="CK.pause()" ${canPause?'':'disabled'}>⏸ Pause</button>
+        <button class="btn danger"  onclick="CK.reset()">↺ Reset</button>
+      </div>
+
+      <button class="ck-move-btn" onclick="CK.move()" ${canMove?'':'disabled'}>
+        Move Made — Switch Clock
+      </button>
+
+      <div class="ck-status ${finished?'bad':running?'ok':''}" id="ckStatusLine">
+        ${finished ? `⚑ ${b.activePlayer === 'white' ? '⬜ White' : '⬛ Black'} flagged`
+          : running ? `● ${b.activePlayer === 'white' ? '⬜ White' : '⬛ Black'} to move`
+          : paused  ? '⏸ Paused'
+          : idle    ? '○ Ready — press Start'
+          : ''}
+      </div>
+    `;
+
+    startRaf();
+  }
+
+  // ── rAF countdown loop ───────────────────────────────────────────────────────
+  // Purely visual. Authoritative time comes from the server snapshot +
+  // elapsed = Date.now() - lastMoveTimestamp.
+
+  function startRaf() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(rafTick);
+  }
+
+  function rafTick() {
+    const b = selectedBoard ? boardMap.get(selectedBoard) : null;
+    if (!b) return;
+
+    const wEl = document.getElementById('ckTimeW');
+    const bEl = document.getElementById('ckTimeB');
+    if (!wEl || !bEl) return; // detail panel not rendered
+
+    const ws = liveRemaining(b, 'white');
+    const bs = liveRemaining(b, 'black');
+
+    wEl.textContent = fmtMs(ws);
+    bEl.textContent = fmtMs(bs);
+
+    // Colour the active clock
+    wEl.className = timeClass(ws, b.status === 'running' && b.activePlayer === 'white');
+    bEl.className = timeClass(bs, b.status === 'running' && b.activePlayer === 'black');
+
+    // Update flagged styling
+    const faceW = document.getElementById('ckFaceW');
+    const faceB = document.getElementById('ckFaceB');
+    if (faceW) { faceW.className = `ck-face ${ws <= 0 ? 'flagged' : b.activePlayer==='white'&&b.status==='running'?'active-clock':''}`; }
+    if (faceB) { faceB.className = `ck-face ${bs <= 0 ? 'flagged' : b.activePlayer==='black'&&b.status==='running'?'active-clock':''}`; }
+
+    if (b.status !== 'finished') rafId = requestAnimationFrame(rafTick);
+  }
+
+  // ── Clock math ───────────────────────────────────────────────────────────────
+  // This mirrors the formula the display page uses.
+  // We do NOT alter the server snapshot — purely derived.
+
+  function liveRemaining(board, player) {
+    if (board.status !== 'running' || board.activePlayer !== player || !board.lastMoveTimestamp) {
+      return player === 'white' ? board.whiteTimeRemaining : board.blackTimeRemaining;
+    }
+    const base = player === 'white' ? board.whiteTimeRemaining : board.blackTimeRemaining;
+    return Math.max(0, base - (Date.now() - board.lastMoveTimestamp));
+  }
+
+  function fmtMs(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function timeClass(ms, active) {
+    const cls = 'ck-time';
+    if (ms <= 0)      return cls + ' expired';
+    if (ms < 30000)   return cls + ' warning';
+    return cls;
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  function init() { connect(); }
+
+  // Expose to window so onclick attributes work
+  return { init, configure, start, pause, move, reset, select };
+})();
+
+// Expose globally for onclick attributes
+window.CK = CK;
+window.ckConfigure = CK.configure;
+
+// Boot everything
+init();        // tournament app
+CK.init();     // clock module
+</script>
+</body>
+</html>

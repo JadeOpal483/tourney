@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: tornelo-host
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python3 tornelo_host_server.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
