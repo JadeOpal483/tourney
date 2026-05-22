@@ -17,6 +17,18 @@
       --accent: #4d8dff;
       --accent-2: #2d6fe8;
     }
+    body.light {
+      --bg-1: #eef2f8;
+      --bg-2: #f7f9fd;
+      --panel: #ffffff;
+      --panel-2: #f7f9fd;
+      --line: #d6deef;
+      --text: #111827;
+      --muted: #5b6478;
+      --gold: #b4892f;
+      --accent: #3b82f6;
+      --accent-2: #2563eb;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -194,28 +206,6 @@
       place-items: center;
       position: relative;
     }
-    .fs-close {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      border: 1px solid #d1d5db;
-      background: #fff;
-      color: #111827;
-      border-radius: 999px;
-      width: 32px;
-      height: 32px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      line-height: 1;
-    }
-    .fs-meta {
-      margin-top: 10px;
-      color: #334155;
-      font-size: 12px;
-      text-align: center;
-      word-break: break-all;
-    }
 
     @media (max-width: 860px) {
       .body { grid-template-columns: 1fr; }
@@ -245,6 +235,7 @@
         <div class="quick">
           <button class="chip" id="useRenderBtn" type="button">Use Current Host</button>
           <button class="chip" id="copyUrlBtn" type="button">Copy URL</button>
+          <button class="chip" id="modeBtn" type="button">Light Mode</button>
           <button class="chip" id="fullBtn" type="button">Fullscreen QR</button>
         </div>
 
@@ -267,15 +258,14 @@
 
   <div id="fsOverlay" class="fs-overlay">
     <div class="fs-card">
-      <button id="fsCloseBtn" class="fs-close" type="button" aria-label="Close">×</button>
       <canvas id="fsQrCanvas" width="640" height="640"></canvas>
       <img id="fsQrImg" alt="Fullscreen QR code" style="display:none;width:min(78vw,640px);height:min(78vw,640px)">
-      <div class="fs-meta" id="fsMeta"></div>
     </div>
   </div>
 
   <script>
     const INPUT_KEY = 'tornelo_player_qr_exact_url_v1';
+    const MODE_KEY = 'tornelo_player_qr_mode_v1';
 
     function guessDefaultUrl() {
       try {
@@ -336,7 +326,6 @@
       const overlay = document.getElementById('fsOverlay');
       const canvas = document.getElementById('fsQrCanvas');
       const img = document.getElementById('fsQrImg');
-      document.getElementById('fsMeta').textContent = url;
       overlay.classList.add('show');
 
       if (window.QRCode && typeof window.QRCode.toCanvas === 'function') {
@@ -364,14 +353,26 @@
       document.getElementById('fsOverlay').classList.remove('show');
     }
 
+    function applyMode(mode) {
+      const light = mode === 'light';
+      document.body.classList.toggle('light', light);
+      document.getElementById('modeBtn').textContent = light ? 'Dark Mode' : 'Light Mode';
+      localStorage.setItem(MODE_KEY, light ? 'light' : 'dark');
+    }
+
+    function toggleMode() {
+      const isLight = document.body.classList.contains('light');
+      applyMode(isLight ? 'dark' : 'light');
+    }
+
     const input = document.getElementById('urlInput');
     input.value = localStorage.getItem(INPUT_KEY) || guessDefaultUrl();
 
     document.getElementById('refreshBtn').addEventListener('click', renderQr);
     document.getElementById('useRenderBtn').addEventListener('click', setCurrentHostUrl);
     document.getElementById('copyUrlBtn').addEventListener('click', copyUrl);
+    document.getElementById('modeBtn').addEventListener('click', toggleMode);
     document.getElementById('fullBtn').addEventListener('click', openFullscreenQr);
-    document.getElementById('fsCloseBtn').addEventListener('click', closeFullscreenQr);
     document.getElementById('fsOverlay').addEventListener('click', (e) => {
       if (e.target.id === 'fsOverlay') closeFullscreenQr();
     });
@@ -380,6 +381,7 @@
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') renderQr(); });
 
+    applyMode(localStorage.getItem(MODE_KEY) || 'dark');
     renderQr();
   </script>
 </body>
