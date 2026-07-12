@@ -205,13 +205,17 @@
       box.innerHTML = matches.map(n => `<div class="suggestion-item" data-name="${n.replace(/"/g, '&quot;')}">${n}</div>`).join('');
       box.style.display = 'block';
       box.querySelectorAll('.suggestion-item').forEach(el => {
-        el.addEventListener('click', () => {
+        const selectSuggestion = (event) => {
+          event.preventDefault();
           const name = el.getAttribute('data-name') || '';
           document.getElementById('nameInput').value = name;
           saveSelectedName(name);
           renderPlayer(currentPlayerName, currentSnapshot);
           hideSuggestions();
-        });
+        };
+        el.addEventListener('pointerdown', selectSuggestion);
+        el.addEventListener('mousedown', selectSuggestion);
+        el.addEventListener('touchstart', selectSuggestion, { passive: false });
       });
     }
 
