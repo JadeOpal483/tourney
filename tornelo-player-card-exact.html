@@ -204,19 +204,20 @@
       if (!matches.length) { hideSuggestions(); return; }
       box.innerHTML = matches.map(n => `<div class="suggestion-item" data-name="${n.replace(/"/g, '&quot;')}">${n}</div>`).join('');
       box.style.display = 'block';
-      box.querySelectorAll('.suggestion-item').forEach(el => {
-        const selectSuggestion = (event) => {
-          event.preventDefault();
-          const name = el.getAttribute('data-name') || '';
-          document.getElementById('nameInput').value = name;
-          saveSelectedName(name);
-          renderPlayer(currentPlayerName, currentSnapshot);
-          hideSuggestions();
-        };
-        el.addEventListener('pointerdown', selectSuggestion);
-        el.addEventListener('mousedown', selectSuggestion);
-        el.addEventListener('touchstart', selectSuggestion, { passive: false });
-      });
+    }
+
+    function selectSuggestionFromEvent(event) {
+      const item = event.target.closest('.suggestion-item');
+      if (!item) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const name = item.getAttribute('data-name') || '';
+      const input = document.getElementById('nameInput');
+      input.value = name;
+      input.blur();
+      saveSelectedName(name);
+      renderPlayer(currentPlayerName, currentSnapshot);
+      hideSuggestions();
     }
 
     function renderPlayer(playerName, snapshot) {
@@ -307,6 +308,9 @@
     });
     document.getElementById('nameInput').addEventListener('input', autoPickFromInput);
     document.getElementById('nameInput').addEventListener('change', autoPickFromInput);
+    document.getElementById('suggestions').addEventListener('pointerdown', selectSuggestionFromEvent);
+    document.getElementById('suggestions').addEventListener('mousedown', selectSuggestionFromEvent);
+    document.getElementById('suggestions').addEventListener('touchstart', selectSuggestionFromEvent, { passive: false });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.search')) hideSuggestions();
     });

@@ -1,9 +1,0 @@
-Quick launch URLs (LAN):
-- Display: http://YOUR_IP:8000/tornelo-display-exact.html
-- Player Card: http://YOUR_IP:8000/tornelo-player-card-exact.html
-- QR: http://YOUR_IP:8000/tornelo-player-qr-exact.html
-
-Local machine URLs:
-- Display: http://localhost:8000/tornelo-display-exact.html
-- Player Card: http://localhost:8000/tornelo-player-card-exact.html
-- QR: http://localhost:8000/tornelo-player-qr-exact.html

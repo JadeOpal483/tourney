@@ -1,0 +1,5 @@
+.DS_Store
+.codex/
+tornelo_server.log
+tornelo_server.pid
+tornelo_snapshot.json
