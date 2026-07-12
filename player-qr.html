@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Player Card QR</title>
+  <style>
+    :root {
+      --bg-1: #0c0e13;
+      --bg-2: #111521;
+      --panel: #171c28;
+      --panel-2: #1d2433;
+      --line: #2d3850;
+      --text: #f5f7fb;
+      --muted: #9da9c2;
+      --gold: #d2ae5b;
+      --accent: #4d8dff;
+      --accent-2: #2d6fe8;
+    }
+    body.light {
+      --bg-1: #f3f5f9;
+      --bg-2: #fafbfd;
+      --panel: #ffffff;
+      --panel-2: #ffffff;
+      --line: #d9dee8;
+      --text: #111318;
+      --muted: #5f6675;
+      --gold: #8c6a22;
+      --accent: #2563eb;
+      --accent-2: #1d4ed8;
+    }
+    body.light .shell { box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12); }
+    body.light .panel { background: #ffffff; }
+    body.light .qr-wrap { border-color: #d7dbe4; }
+    body.light .badge { background: #eef2ff; color: #1f2937; border-color: #d4ddf7; }
+    body.light .link { color: #1e40af; border-top-color: #d9dee8; }
+    body.light .chip { background: #f8fafc; color: #1f2937; border-color: #d3dae7; }
+    body.light input { background: #ffffff; color: #111318; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 440px at 90% -20%, rgba(210,174,91,0.16) 0%, transparent 60%),
+        radial-gradient(700px 340px at -10% 110%, rgba(77,141,255,0.16) 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+      padding: 18px;
+      display: grid;
+      place-items: center;
+    }
+    .shell {
+      width: min(880px, 100%);
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+    .top {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 8px;
+    }
+    .kicker {
+      font-size: 11px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .title {
+      font-size: 30px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.2px;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .body {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(12, 16, 24, 0.38);
+      padding: 14px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 12px;
+      background: #101521;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+
+    button {
+      border: 1px solid var(--accent-2);
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #fff;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .qr-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 340px;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #d8dbe2;
+      padding: 10px;
+      position: relative;
+    }
+
+    .badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #111827;
+      color: #f9fafb;
+      border: 1px solid #2e3c58;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .notes {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .link {
+      margin-top: 12px;
+      border-top: 1px dashed #3a465f;
+      padding-top: 10px;
+      font-size: 12px;
+      color: #bfd3ff;
+      word-break: break-all;
+    }
+
+    .quick {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      border: 1px solid #3a465f;
+      background: #121827;
+      color: #dbe6ff;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .fs-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 14, 0.96);
+      z-index: 9999;
+      display: none;
+      place-items: center;
+      padding: 18px;
+    }
+    .fs-overlay.show { display: grid; }
+    .fs-card {
+      width: min(92vw, 820px);
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    @media (max-width: 860px) {
+      .body { grid-template-columns: 1fr; }
+      .title { font-size: 26px; }
+      .row { grid-template-columns: 1fr; }
+      button { width: 100%; }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div class="kicker">Tournament Access</div>
+      <div class="title">Player Card QR</div>
+      <div class="sub">Scan once, bookmark the player card page, then players can refresh for new rounds.</div>
+    </div>
+
+    <div class="body">
+      <div class="panel">
+        <div class="field-label">Player Card URL</div>
+        <div class="row">
+          <input id="urlInput" type="text" placeholder="https://your-host/player-card.html">
+          <button id="refreshBtn">Generate QR</button>
+        </div>
+
+        <div class="quick">
+          <button class="chip" id="useRenderBtn" type="button">Use Current Host</button>
+          <button class="chip" id="copyUrlBtn" type="button">Copy URL</button>
+          <button class="chip" id="modeBtn" type="button">Light Mode</button>
+          <button class="chip" id="fullBtn" type="button">Fullscreen QR</button>
+        </div>
+
+        <div class="notes">
+          Tip: Keep this URL stable and share only this QR. After each CSV upload, player pages update automatically from the same link.
+        </div>
+
+        <div class="link" id="urlPreview"></div>
+      </div>
+
+      <div class="panel">
+        <div class="qr-wrap">
+          <div class="badge">Live QR</div>
+          <canvas id="qrCanvas" width="300" height="300"></canvas>
+          <img id="qrImg" alt="QR code" style="display:none;width:300px;height:300px">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="fsOverlay" class="fs-overlay">
+    <div class="fs-card">
+      <canvas id="fsQrCanvas" width="640" height="640"></canvas>
+      <img id="fsQrImg" alt="Fullscreen QR code" style="display:none;width:min(78vw,640px);height:min(78vw,640px)">
+    </div>
+  </div>
+
+  <script>
+    const INPUT_KEY = 'tornelo_player_qr_exact_url_v1';
+    const MODE_KEY = 'tornelo_player_qr_mode_v1';
+
+    function guessDefaultUrl() {
+      try {
+        const base = location.href.replace(/[^/]+$/, '');
+        return base + 'player-card.html';
+      } catch (_) {
+        return 'player-card.html';
+      }
+    }
+
+    function renderQr() {
+      const input = document.getElementById('urlInput');
+      const preview = document.getElementById('urlPreview');
+      const canvas = document.getElementById('qrCanvas');
+      const img = document.getElementById('qrImg');
+      const url = (input.value || '').trim();
+      if (!url) return;
+      localStorage.setItem(INPUT_KEY, url);
+      preview.textContent = url;
+
+      if (window.QRCode && typeof window.QRCode.toCanvas === 'function') {
+        img.style.display = 'none';
+        canvas.style.display = '';
+        QRCode.toCanvas(canvas, url, {
+          width: 300,
+          margin: 1,
+          color: { dark: '#111827', light: '#ffffff' }
+        }, (err) => {
+          if (err) {
+            canvas.style.display = 'none';
+            img.style.display = '';
+            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
+          }
+        });
+      } else {
+        canvas.style.display = 'none';
+        img.style.display = '';
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
+      }
+    }
+
+    function setCurrentHostUrl() {
+      document.getElementById('urlInput').value = guessDefaultUrl();
+      renderQr();
+    }
+
+    async function copyUrl() {
+      const url = (document.getElementById('urlInput').value || '').trim();
+      if (!url) return;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch (_) {}
+    }
+
+    function openFullscreenQr() {
+      const url = (document.getElementById('urlInput').value || '').trim();
+      if (!url) return;
+      const overlay = document.getElementById('fsOverlay');
+      const canvas = document.getElementById('fsQrCanvas');
+      const img = document.getElementById('fsQrImg');
+      overlay.classList.add('show');
+
+      if (window.QRCode && typeof window.QRCode.toCanvas === 'function') {
+        img.style.display = 'none';
+        canvas.style.display = '';
+        QRCode.toCanvas(canvas, url, {
+          width: 640,
+          margin: 1,
+          color: { dark: '#111827', light: '#ffffff' }
+        }, (err) => {
+          if (err) {
+            canvas.style.display = 'none';
+            img.style.display = '';
+            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=640x640&data=' + encodeURIComponent(url);
+          }
+        });
+      } else {
+        canvas.style.display = 'none';
+        img.style.display = '';
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=640x640&data=' + encodeURIComponent(url);
+      }
+    }
+
+    function closeFullscreenQr() {
+      document.getElementById('fsOverlay').classList.remove('show');
+    }
+
+    function applyMode(mode) {
+      const light = mode === 'light';
+      document.body.classList.toggle('light', light);
+      document.getElementById('modeBtn').textContent = light ? 'Dark Mode' : 'Light Mode';
+      localStorage.setItem(MODE_KEY, light ? 'light' : 'dark');
+    }
+
+    function toggleMode() {
+      const isLight = document.body.classList.contains('light');
+      applyMode(isLight ? 'dark' : 'light');
+    }
+
+    const input = document.getElementById('urlInput');
+    input.value = localStorage.getItem(INPUT_KEY) || guessDefaultUrl();
+
+    document.getElementById('refreshBtn').addEventListener('click', renderQr);
+    document.getElementById('useRenderBtn').addEventListener('click', setCurrentHostUrl);
+    document.getElementById('copyUrlBtn').addEventListener('click', copyUrl);
+    document.getElementById('modeBtn').addEventListener('click', toggleMode);
+    document.getElementById('fullBtn').addEventListener('click', openFullscreenQr);
+    document.getElementById('fsOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'fsOverlay') closeFullscreenQr();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeFullscreenQr();
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') renderQr(); });
+
+    applyMode(localStorage.getItem(MODE_KEY) || 'dark');
+    renderQr();
+  </script>
+</body>
+</html>

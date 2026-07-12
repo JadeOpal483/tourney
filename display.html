@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess64 — Live Display</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap');
+
+  :root {
+    --bg:      #08080a;
+    --surface: #101014;
+    --surface2:#181820;
+    --border:  #1e1e2a;
+    --accent:  #c9a84c;
+    --gold:    #f0c040;
+    --silver:  #c0c0d0;
+    --bronze:  #c07850;
+    --text:    #f0ece0;
+    --dim:     #605040;
+    --green:   #50c080;
+    --blue:    #5080d0;
+    --red:     #d05050;
+    --white-sq:#f0e6c8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', Georgia, serif;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-conic-gradient(rgba(255,255,255,0.01) 0% 25%, transparent 0% 50%) 0 0 / 56px 56px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── Main grid ── */
+  .screen {
+    position: relative; z-index: 1;
+    width: 100vw; height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: "hd hd" "lb pr" "ft ft";
+  }
+
+  /* ── HEADER ── */
+  .hd {
+    grid-area: hd;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 36px;
+    display: flex; align-items: center; gap: 28px;
+  }
+  .logo { font-size: 32px; filter: drop-shadow(0 0 10px rgba(201,168,76,0.3)); line-height: 1; }
+  .t-info { flex: 1; min-width: 0; }
+  .t-name { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 900; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+  .t-sub  { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-top: 2px; }
+  .hd-timer { text-align: center; min-width: 160px; }
+  .timer-lbl { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); margin-bottom: 2px; }
+  .timer-val { font-family: 'JetBrains Mono', monospace; font-size: 44px; font-weight: 700; letter-spacing: 4px; line-height: 1; color: var(--accent); text-shadow: 0 0 16px rgba(201,168,76,0.3); transition: color 0.3s; }
+  .timer-val.warning { color: #e07840; text-shadow: 0 0 16px rgba(224,120,64,0.4); }
+  .timer-val.expired { color: var(--red); text-shadow: 0 0 16px rgba(208,80,80,0.4); }
+  .hd-round { text-align: right; min-width: 120px; }
+  .hd-upload { min-width: 180px; text-align: right; }
+  .upload-btn {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+  .upload-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .round-num { font-family: 'Playfair Display', serif; font-size: 40px; font-weight: 900; color: var(--text); line-height: 1; }
+  .round-lbl { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
+
+  /* ── LEADERBOARD ── */
+  .lb { grid-area: lb; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .panel-hd { padding: 12px 26px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 10px; }
+  .panel-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
+  .panel-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--dim); margin-left: auto; }
+  .lb-list { flex: 1; overflow: hidden; }
+
+  .lb-row { display: grid; grid-template-columns: 52px 1fr 90px 72px; align-items: center; padding: 0 26px; height: 54px; border-bottom: 1px solid rgba(30,30,42,0.5); position: relative; }
+  .lb-row.top8 { background: rgba(201,168,76,0.05); }
+  .lb-row.top8::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); opacity: 0.3; }
+  .lb-row.r1::before { background: var(--gold);   opacity: 1;   width: 3px; }
+  .lb-row.r2::before { background: var(--silver); opacity: 0.75; }
+  .lb-row.r3::before { background: var(--bronze); opacity: 0.6; }
+  .rank-circle { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: auto; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; background: var(--surface2); color: var(--dim); border: 1px solid var(--border); }
+  .rank-circle.gold   { background: linear-gradient(135deg,#c9a84c,#f0c040); color:#0d0d0f; border-color:#f0c040; }
+  .rank-circle.silver { background: linear-gradient(135deg,#888,#d0d0d8);    color:#0d0d0f; border-color:#d0d0d8; }
+  .rank-circle.bronze { background: linear-gradient(135deg,#a06040,#d08060); color:#0d0d0f; border-color:#d08060; }
+  .lb-name { font-size: 19px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb-name.r1 { font-size: 21px; color: var(--gold); }
+  .lb-name.r2 { color: var(--silver); }
+  .lb-name.r3 { color: var(--bronze); }
+  .lb-score { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 22px; color: var(--accent); text-align: right; }
+  .lb-score.r1 { font-size: 26px; color: var(--gold); }
+  .lb-buch { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--dim); text-align: right; }
+  @keyframes rankFlash { 0%{background:rgba(201,168,76,0.15)} 100%{background:transparent} }
+  .lb-row.changed { animation: rankFlash 1.4s ease-out; }
+
+  /* ── PAIRINGS / RIGHT COLUMN ── */
+  .pr { grid-area: pr; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* The right column switches between pairings and clock views */
+  .pr-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* Pairings list */
+  .pr-list { flex: 1; overflow-y: auto; padding: 10px 22px; display: flex; flex-direction: column; gap: 7px; }
+  .pair-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 14px 10px; display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 10px; flex-shrink: 0; transition: border-color 0.3s; position: relative; }
+  .pair-card.done     { border-color: rgba(201,168,76,0.16); }
+  .pair-card.bye-card { grid-template-columns: 1fr auto; }
+  .pp { display: flex; flex-direction: column; gap: 1px; }
+  .pp-color { font-family:'JetBrains Mono',monospace; font-size:8px; text-transform:uppercase; letter-spacing:1.5px; color:var(--dim); }
+  .pp-name  { font-size: 17px; font-weight: 600; }
+  .pp-score { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent); }
+  .pair-vs { font-family:'Playfair Display',serif; font-size:16px; color:var(--dim); }
+  .pair-result { font-family:'JetBrains Mono',monospace; font-size:11px; text-align:center; padding:3px 8px; border-radius:5px; border:1px solid var(--border); min-width:72px; }
+  .pair-result.w  { color:var(--white-sq); border-color:rgba(240,230,200,0.22); background:rgba(240,230,200,0.06); }
+  .pair-result.b  { color:#a08060;         border-color:rgba(120,80,50,0.28);   background:rgba(50,30,15,0.28); }
+  .pair-result.d  { color:var(--blue);     border-color:rgba(80,128,208,0.22);  background:rgba(80,128,208,0.06); }
+  .pair-result.ip { color:var(--dim); font-style:italic; font-family:'Crimson Pro',serif; border-color:transparent; }
+
+  /* Table number badge — inside each pairing card */
+  .pair-table-num {
+    position: absolute; top: 6px; right: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: #0d0d0f; background: linear-gradient(135deg, #c9a84c, #f0c040);
+    border: 1px solid rgba(240,192,64,0.75); border-radius: 999px;
+    padding: 1px 8px;
+    box-shadow: 0 0 12px rgba(201,168,76,0.35);
+  }
+
+  /* ── CHESS CLOCKS PANEL (right column, below panel-hd) ── */
+  .clocks-panel {
+    flex: 1; overflow-y: auto;
+    padding: 12px 18px; display: flex; flex-direction: column; gap: 10px;
+  }
+
+  /* Individual clock card for each board */
+  .disp-clock-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .disp-clock-card.running { border-color: rgba(80,192,128,0.3); }
+  .disp-clock-card.finished { border-color: rgba(208,80,80,0.3); }
+
+  .disp-clock-board {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    text-transform: uppercase; letter-spacing: 2px; color: var(--dim);
+    margin-bottom: 10px;
+  }
+  .disp-clock-board .ck-status-pill {
+    float: right;
+    padding: 1px 8px; border-radius: 20px; font-size: 8px; text-transform: uppercase; letter-spacing: 1px;
+    border: 1px solid;
+  }
+  .ck-status-pill.running  { color: var(--green); border-color: rgba(80,192,128,0.3); }
+  .ck-status-pill.paused   { color: #e07840;      border-color: rgba(224,120,64,0.3); }
+  .ck-status-pill.finished { color: var(--red);   border-color: rgba(208,80,80,0.3); }
+  .ck-status-pill.idle     { color: var(--dim);   border-color: var(--border); }
+
+  /* Two clocks side by side */
+  .disp-clock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .disp-clock-face {
+    border-radius: 8px; padding: 12px 10px; text-align: center;
+    background: var(--surface2); border: 1px solid var(--border);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .disp-clock-face.active { border-color: var(--accent); background: rgba(201,168,76,0.07); }
+  .disp-clock-face.flagged { border-color: var(--red) !important; background: rgba(208,80,80,0.07) !important; }
+  .disp-clock-who { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 6px; }
+  .disp-clock-face.active .disp-clock-who { color: var(--accent); }
+  .disp-clock-time { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; letter-spacing: 2px; color: var(--dim); line-height: 1; transition: color 0.2s; }
+  .disp-clock-face.active   .disp-clock-time { color: var(--accent); }
+  .disp-clock-face.flagged  .disp-clock-time { color: var(--red) !important; }
+  .disp-clock-time.warning  { color: #e07840 !important; }
+  .disp-clock-time.expired  { color: var(--red) !important; }
+
+  /* Tabs inside the right column header */
+  .pr-tabs { display: flex; gap: 0; }
+  .pr-tab-btn {
+    padding: 0 16px; height: 100%; border: none; background: none;
+    color: var(--dim); font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .pr-tab-btn:hover { color: var(--text); }
+  .pr-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Empty state */
+  .empty-disp { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--dim); font-family:'JetBrains Mono',monospace; font-size:12px; }
+  .empty-disp .icon { font-size: 44px; opacity: 0.35; }
+
+  /* ── FOOTER ── */
+  .ft { grid-area: ft; background: var(--surface); border-top: 1px solid var(--border); padding: 9px 36px; display: flex; align-items: center; gap: 16px; height: 44px; }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
+  .ft-lbl { font-family:'JetBrains Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:2px; color:var(--dim); }
+  .ft-clock-conn { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--dim); }
+  .ft-clock-conn.ok  { color: var(--green); }
+  .ft-clock-conn.bad { color: var(--red); }
+  .ft-sep { flex: 1; }
+  .ft-brand { font-family:'Playfair Display',serif; font-size:13px; color:var(--dim); }
+  .ft-brand strong { color: var(--accent); }
+
+  /* ══════════════════════════════════════════════
+     PODIUM OVERLAY (unchanged from before)
+  ══════════════════════════════════════════════ */
+  .podium-overlay { position: fixed; inset: 0; z-index: 200; background: #06060a; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.6s ease; }
+  .podium-overlay.show { opacity: 1; pointer-events: auto; }
+  .podium-rule { width: 100%; height: 2px; background: linear-gradient(90deg, transparent 0%, var(--gold) 20%, var(--gold) 80%, transparent 100%); position: absolute; top: 0; opacity: 0.5; }
+  .podium-rule-bottom { bottom: 0; top: auto; }
+  .podium-event { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 4px; color: var(--dim); margin-bottom: 10px; }
+  .podium-headline { font-family: 'Playfair Display', serif; font-size: 52px; font-weight: 900; color: var(--text); letter-spacing: -1px; line-height: 1; margin-bottom: 6px; }
+  .podium-headline span { color: var(--gold); }
+  .podium-divider { width: 80px; height: 1px; background: var(--gold); opacity: 0.4; margin: 18px 0 36px; }
+  .podium-cards { display: flex; align-items: stretch; gap: 1px; width: 90vw; max-width: 1100px; }
+  .pod-card { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 28px 16px 24px; background: var(--surface); border: 1px solid var(--border); position: relative; opacity: 0; transition: opacity 0.5s ease; }
+  .pod-card.show { opacity: 1; }
+  .pod-card:first-child { border-radius: 12px 0 0 12px; }
+  .pod-card:last-child  { border-radius: 0 12px 12px 0; }
+  .pod-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--border); border-radius: inherit; }
+  .pod-card.rank-1::before { background: var(--gold);   height: 4px; }
+  .pod-card.rank-2::before { background: var(--silver); }
+  .pod-card.rank-3::before { background: var(--bronze); }
+  .pod-card.rank-1 { background: linear-gradient(180deg, rgba(240,192,64,0.06) 0%, var(--surface) 40%); border-color: rgba(240,192,64,0.2); }
+  .pod-rank-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin-bottom: 12px; }
+  .pod-card.rank-1 .pod-rank-num { color: var(--gold); }
+  .pod-card.rank-2 .pod-rank-num { color: var(--silver); }
+  .pod-card.rank-3 .pod-rank-num { color: var(--bronze); }
+  .pod-medal { font-size: 28px; line-height: 1; margin-bottom: 14px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
+  .pod-name { font-family: 'Playfair Display', serif; font-weight: 700; text-align: center; line-height: 1.2; margin-bottom: 10px; }
+  .pod-card.rank-1 .pod-name { font-size: 26px; color: var(--gold); }
+  .pod-card.rank-2 .pod-name { font-size: 22px; color: var(--silver); }
+  .pod-card.rank-3 .pod-name { font-size: 20px; color: var(--bronze); }
+  .pod-card.rank-4 .pod-name, .pod-card.rank-5 .pod-name { font-size: 18px; color: var(--text); }
+  .pod-sep { width: 32px; height: 1px; background: var(--border); margin: 10px 0; }
+  .pod-card.rank-1 .pod-sep { background: rgba(240,192,64,0.3); width: 48px; }
+  .pod-score { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .pod-card.rank-1 .pod-score { font-size: 28px; color: var(--gold); }
+  .pod-card.rank-2 .pod-score { font-size: 22px; color: var(--silver); }
+  .pod-card.rank-3 .pod-score { font-size: 20px; color: var(--bronze); }
+  .pod-card.rank-4 .pod-score, .pod-card.rank-5 .pod-score { font-size: 18px; color: var(--dim); }
+  .pod-score-lbl { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--dim); }
+  .pod-tb { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="screen">
+
+  <!-- HEADER (unchanged) -->
+  <div class="hd">
+    <div class="logo">♟</div>
+    <div class="t-info">
+      <div class="t-name" id="dispName">Chess64 Tournament</div>
+      <div class="t-sub">Live Standings</div>
+    </div>
+    <div class="hd-timer" id="timerBlock" style="display:none">
+      <div class="timer-lbl">Time Remaining</div>
+      <div class="timer-val" id="dispTimer">--:--</div>
+    </div>
+    <div class="hd-round">
+      <div class="round-lbl">Round</div>
+      <div class="round-num" id="dispRound">—</div>
+    </div>
+    <div class="hd-upload">
+      <button class="upload-btn" id="uploadCsvBtn">Upload Tornelo CSV</button>
+      <input id="uploadCsvInput" type="file" accept=".csv,text/csv" style="display:none">
+    </div>
+  </div>
+
+  <!-- LEADERBOARD (unchanged) -->
+  <div class="lb">
+    <div class="panel-hd">
+      <div class="panel-title">Standings</div>
+      <div class="panel-count" id="dispCount">0 players</div>
+    </div>
+    <div class="lb-list" id="lbList">
+      <div class="empty-disp"><div class="icon">♟</div><div>Waiting for tournament…</div></div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: Pairings OR Chess Clocks -->
+  <div class="pr">
+    <div class="panel-hd">
+      <div class="panel-title" id="pairingsTitle">Current Pairings</div>
+      <!-- Sub-tabs inside the right column -->
+      <div class="pr-tabs">
+        <button class="pr-tab-btn active" id="prTabPairings" onclick="prSwitchTab('pairings')">Pairings</button>
+        <button class="pr-tab-btn"        id="prTabClocks"   onclick="prSwitchTab('clocks')">Clocks</button>
+      </div>
+    </div>
+    <div class="pr-body">
+      <!-- Pairings view -->
+      <div id="prPairingsView" class="pr-list">
+        <div class="empty-disp"><div class="icon">⚡</div><div>Pairings will appear here</div></div>
+      </div>
+      <!-- Clocks view -->
+      <div id="prClocksView" class="clocks-panel" style="display:none">
+        <div class="empty-disp"><div class="icon">⏱</div><div>Waiting for clock server…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ft">
+    <div class="live-dot"></div>
+    <div class="ft-lbl">Live Broadcast</div>
+    <div class="ft-clock-conn" id="ftClockConn"></div>
+    <div class="ft-sep"></div>
+    <div class="ft-brand"><strong>♟ Chess</strong>Café</div>
+  </div>
+
+</div>
+
+<!-- PODIUM OVERLAY (unchanged) -->
+<div class="podium-overlay" id="podiumOverlay">
+  <div class="podium-rule"></div>
+  <div class="podium-rule podium-rule-bottom"></div>
+  <div class="podium-event" id="podEvent">Chess64 Tournament</div>
+  <div class="podium-headline">Final <span>Standings</span></div>
+  <div class="podium-divider"></div>
+  <div class="podium-cards" id="podiumCards"></div>
+</div>
+
+<!-- Socket.io client from server -->
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  TOURNAMENT DISPLAY — localStorage polling (unchanged logic)
+// ═══════════════════════════════════════════════════════════════
+const STORE_KEY   = 'chessCafeTournament';
+const TORNelo_STORE_KEY = 'tornelo_display_snapshot_v1';
+const SNAPSHOT_API_PATH = '/api/snapshot';
+let prevOrder     = [];
+let podiumActive  = false;
+let prActiveTab   = 'pairings'; // 'pairings' | 'clocks'
+let remoteSnapshotCache = null;
+
+const TIEBREAK_LABELS = {
+  'buchholz':'Buchholz','buchholz-cut1':'Buch. Cut-1','sonneborn':'SB Score',
+  'head-to-head':'H2H','wins':'Wins','cumulative':'Cumulative','black-wins':'Black Wins',
+};
+
+function loadTournamentState() {
+  try {
+    if (remoteSnapshotCache && Array.isArray(remoteSnapshotCache.players)) return remoteSnapshotCache;
+    const uploaded = localStorage.getItem(TORNelo_STORE_KEY);
+    if (uploaded) {
+      const parsed = JSON.parse(uploaded);
+      if (parsed && Array.isArray(parsed.players)) return parsed;
+    }
+    const r = localStorage.getItem(STORE_KEY);
+    return r ? JSON.parse(r) : null;
+  }
+  catch(e) { return null; }
+}
+
+async function pullRemoteSnapshot() {
+  try {
+    const res = await fetch(SNAPSHOT_API_PATH, { cache: 'no-store' });
+    if (!res.ok) return;
+    const parsed = await res.json();
+    if (!parsed || !Array.isArray(parsed.players)) return;
+    remoteSnapshotCache = parsed;
+    localStorage.setItem(TORNelo_STORE_KEY, JSON.stringify(parsed));
+  } catch (_) {}
+}
+
+async function saveRemoteSnapshot(snapshot) {
+  const res = await fetch(SNAPSHOT_API_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(snapshot)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+function parseCsvLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      cells.push(current.trim());
+      current = '';
+    } else current += ch;
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function parseTorneloCsvToState(text, fileName) {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) throw new Error('CSV is empty');
+  const headers = parseCsvLine(lines[0]);
+  const rows = lines.slice(1).map(parseCsvLine);
+  const findIdx = (...names) => headers.findIndex(h => names.includes(String(h).trim()));
+
+  const rankIdx = findIdx('Rank', '#');
+  const playerIdx = findIdx('Player', 'Name');
+  const scoreIdx = findIdx('Score', 'Points');
+  const tbIdx = findIdx('Buchholz', 'TB', 'Tiebreak');
+  if (playerIdx >= 0 && scoreIdx >= 0) {
+    const players = rows
+      .map((row, i) => {
+        const name = String(row[playerIdx] || '').trim();
+        if (!name) return null;
+        return {
+          id: `p-${i}-${name.toLowerCase().replace(/\s+/g,'-')}`,
+          name,
+          score: Number(row[scoreIdx] || 0) || 0,
+          tiebreak: Number(tbIdx >= 0 ? row[tbIdx] : 0) || 0,
+          wins: 0,
+          seed: rankIdx >= 0 ? Number(row[rankIdx] || i + 1) || (i + 1) : (i + 1)
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.seed - b.seed);
+
+    const roundMatch = (fileName || '').match(/round[-_\s]*(\d+)/i);
+    return {
+      meta: { name: 'Chess64 Tournament', tiebreak: 'buchholz' },
+      players,
+      rounds: [],
+      currentRound: roundMatch ? Number(roundMatch[1]) : 0,
+      timer: null,
+      podium: false
+    };
+  }
+
+  const whiteIdx = findIdx('White player');
+  const blackIdx = findIdx('Black player');
+  const scoreIndexes = headers
+    .map((h, i) => ({ h: String(h).trim(), i }))
+    .filter(x => x.h === 'Score')
+    .map(x => x.i);
+  const scoreLeftIdx = scoreIndexes.length ? scoreIndexes[0] : -1;
+  const scoreRightIdx = scoreIndexes.length > 1 ? scoreIndexes[scoreIndexes.length - 1] : scoreLeftIdx;
+  if (whiteIdx < 0 || blackIdx < 0) throw new Error('Unsupported CSV format');
+
+  const names = new Set();
+  const scoreByName = new Map();
+  const pairings = rows.map((row, i) => {
+    const whiteName = String(row[whiteIdx] || '').trim();
+    const blackName = String(row[blackIdx] || '').trim();
+    if (!whiteName || !blackName) return null;
+    names.add(whiteName); names.add(blackName);
+    const ws = Number(String(row[scoreLeftIdx] ?? '').trim());
+    const bs = Number(String(row[scoreRightIdx] ?? '').trim());
+    if (!Number.isNaN(ws)) scoreByName.set(whiteName, ws);
+    if (!Number.isNaN(bs)) scoreByName.set(blackName, bs);
+    return {
+      tableNumber: i + 1,
+      whiteName,
+      blackName,
+      result: null
+    };
+  }).filter(Boolean);
+
+  const players = [...names].sort((a,b)=>a.localeCompare(b)).map((name, i) => ({
+    id: `p-${i}-${name.toLowerCase().replace(/\s+/g,'-')}`,
+    name, score: scoreByName.get(name) ?? 0, tiebreak: 0, wins: 0, seed: i + 1
+  }));
+  const idByName = new Map(players.map(p => [p.name, p.id]));
+  const roundPairings = pairings.map(p => ({
+    tableNumber: p.tableNumber,
+    white: idByName.get(p.whiteName),
+    black: idByName.get(p.blackName),
+    result: null
+  }));
+  const roundMatch = (fileName || '').match(/round[-_\s]*(\d+)/i);
+  const roundNum = roundMatch ? Number(roundMatch[1]) : 1;
+  return {
+    meta: { name: 'Chess64 Tournament', tiebreak: 'buchholz' },
+    players,
+    rounds: [{ number: roundNum, pairings: roundPairings }],
+    currentRound: roundNum,
+    timer: null,
+    podium: false
+  };
+}
+
+function bindUpload() {
+  const btn = document.getElementById('uploadCsvBtn');
+  const input = document.getElementById('uploadCsvInput');
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = parseTorneloCsvToState(text, file.name);
+      remoteSnapshotCache = parsed;
+      localStorage.setItem(TORNelo_STORE_KEY, JSON.stringify(parsed));
+      try {
+        await saveRemoteSnapshot(parsed);
+      } catch (e) {
+        console.warn('Remote snapshot save failed, using local fallback.', e);
+      }
+      refreshTournament();
+    } catch (err) {
+      alert(`CSV import failed: ${err.message}`);
+    } finally {
+      input.value = '';
+    }
+  });
+}
+
+function refreshTournament() {
+  const state = loadTournamentState();
+  if (!state) return;
+  // Permanent podium: when podiumPermanent is set, never auto-hide.
+  // The podium only clears when admin explicitly dismisses it.
+  const permanent = !!(state.meta && state.meta.podiumPermanent);
+  if (state.podium && !podiumActive) showPodium(state);
+  if (!state.podium && podiumActive && !permanent) hidePodium();
+  if (!podiumActive) {
+    renderHeader(state);
+    renderTimer(state);
+    renderLeaderboard(state);
+    if (prActiveTab === 'pairings') renderPairings(state);
+  }
+}
+
+setInterval(refreshTournament, 2000);
+refreshTournament();
+bindUpload();
+pullRemoteSnapshot();
+setInterval(pullRemoteSnapshot, 3000);
+
+// ── Right column tab switcher ───────────────────────────────────────────────
+function prSwitchTab(tab) {
+  prActiveTab = tab;
+  document.getElementById('prTabPairings').classList.toggle('active', tab === 'pairings');
+  document.getElementById('prTabClocks').classList.toggle('active',   tab === 'clocks');
+  document.getElementById('prPairingsView').style.display = tab === 'pairings' ? '' : 'none';
+  document.getElementById('prClocksView').style.display   = tab === 'clocks'   ? '' : 'none';
+  if (tab === 'pairings') {
+    const s = loadTournamentState();
+    if (s) renderPairings(s);
+  }
+}
+
+// ── Header ──────────────────────────────────────────────────────────────────
+function renderHeader(state) {
+  document.getElementById('dispName').textContent  = state.meta?.name || 'Chess64 Tournament';
+  document.getElementById('dispCount').textContent = `${state.players.length} players`;
+  document.getElementById('pairingsTitle').textContent =
+    state.rounds.length ? `Round ${state.rounds[state.rounds.length-1].number} Pairings` : 'Current Pairings';
+  document.getElementById('dispRound').textContent = state.currentRound > 0 ? `${state.currentRound}` : '—';
+}
+
+// ── Round timer ──────────────────────────────────────────────────────────────
+function renderTimer(state) {
+  const t = state.timer; const blk = document.getElementById('timerBlock'); const el = document.getElementById('dispTimer');
+  if (!t || (!t.running && t.remaining >= t.duration)) { blk.style.display = 'none'; return; }
+  blk.style.display = '';
+  const remaining = t.running && t.startTime ? Math.max(0, t.duration - (Date.now() - t.startTime) / 1000) : t.remaining;
+  const m = Math.floor(remaining / 60), s = Math.floor(remaining % 60);
+  el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  el.className   = 'timer-val' + (remaining<=0?' expired':remaining<300?' warning':'');
+}
+
+// ── Leaderboard ──────────────────────────────────────────────────────────────
+function renderLeaderboard(state) {
+  const list = document.getElementById('lbList');
+  const safePlayers = Array.isArray(state.players) ? state.players : [];
+  if (!safePlayers.length) { list.innerHTML = `<div class="empty-disp"><div class="icon">&#9822;</div><div>Waiting for tournament&#8230;</div></div>`; prevOrder = []; return; }
+  const sorted   = sortPlayers(state);
+  if (!Array.isArray(sorted)) { prevOrder = []; return; }
+  const newOrder = sorted.map(p => p.id);
+  const changed  = new Set();
+  if (prevOrder.length) { newOrder.forEach((id, i) => { if (prevOrder.indexOf(id) !== i) changed.add(id); }); }
+  prevOrder = newOrder;
+  const rowH = 54, maxRows = Math.max(4, Math.floor((list.clientHeight || 580) / rowH));
+  list.innerHTML = sorted.slice(0, maxRows).map((p, i) => {
+    const rank = i+1, rc = rank===1?'r1':rank===2?'r2':rank===3?'r3':'', cc = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
+    const cls  = ['lb-row', rank<=8?'top8':'', rc, changed.has(p.id)?'changed':''].filter(Boolean).join(' ');
+    return `<div class="${cls}">
+      <div class="rank-circle ${cc}">${rank}</div>
+      <div class="lb-name ${rc}">${esc(p.name)}</div>
+      <div class="lb-score ${rc}">${fmtScore(p.score)}</div>
+      <div class="lb-buch">${fmtTb(p.tiebreak, state.meta?.tiebreak)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Pairings ─────────────────────────────────────────────────────────────────
+function renderPairings(state) {
+  const list  = document.getElementById('prPairingsView');
+  const rounds = Array.isArray(state.rounds) ? state.rounds : [];
+  const round = rounds[rounds.length - 1];
+  if (!round || !Array.isArray(round.pairings)) { list.innerHTML = `<div class="empty-disp"><div class="icon">&#9889;</div><div>Pairings will appear here</div></div>`; return; }
+  const allPlayers = Array.isArray(state.players) ? state.players : [];
+  const getP = id => allPlayers.find(p => p.id === id);
+  list.innerHTML = round.pairings.map(p => {
+    if (p.result === 'bye') {
+      const bp = getP(p.white);
+      return `<div class="pair-card bye-card done"><div class="pp"><div class="pp-color">BYE</div><div class="pp-name">${bp?esc(bp.name):'?'}</div></div><div class="pair-result w">+1 pt</div></div>`;
+    }
+    const w = getP(p.white), b = getP(p.black); if (!w || !b) return '';
+    let res = `<div class="pair-result ip">In play…</div>`;
+    if (p.result==='white') res = `<div class="pair-result w">⬜ White</div>`;
+    else if (p.result==='black') res = `<div class="pair-result b">⬛ Black</div>`;
+    else if (p.result==='draw')  res = `<div class="pair-result d">½ − ½</div>`;
+    const tableLabel = p.tableNumber != null ? `<div class="pair-table-num">Table ${p.tableNumber}</div>` : '';
+    return `<div class="pair-card ${p.result?'done':''}">
+      ${tableLabel}
+      <div class="pp"><div class="pp-color">⬜ White</div><div class="pp-name">${esc(w.name)}</div><div class="pp-score">${fmtScore(w.score)} pts</div></div>
+      <div class="pair-vs">vs</div>
+      <div class="pp" style="text-align:right"><div class="pp-color" style="text-align:right">⬛ Black</div><div class="pp-name">${esc(b.name)}</div><div class="pp-score">${fmtScore(b.score)} pts</div></div>
+      ${res}
+    </div>`;
+  }).join('');
+}
+
+// ── Podium ───────────────────────────────────────────────────────────────────
+function showPodium(state) {
+  podiumActive = true;
+  const sorted = sortPlayers(state);
+  const configuredTop = parseInt(state.meta?.podiumTopN, 10);
+  const topN = Number.isFinite(configuredTop) ? Math.max(1, Math.min(50, configuredTop)) : 5;
+  const podiumPlayers = sorted.slice(0, topN);
+  const tbMethod = state.meta?.tiebreak || 'buchholz';
+  const tbLabel  = TIEBREAK_LABELS[tbMethod] || 'Tiebreak';
+  const medals   = ['🥇','🥈','🥉'];
+  document.getElementById('podEvent').textContent = state.meta?.name || 'Chess64 Tournament';
+  document.getElementById('podiumCards').innerHTML = podiumPlayers.map((p, i) => {
+    const rank = i+1, medal = medals[i] ? `<div class="pod-medal">${medals[i]}</div>` : '';
+    return `<div class="pod-card rank-${rank}" id="podCard${i}">
+      <div class="pod-rank-num">${ordinal(rank)} Place</div>${medal}
+      <div class="pod-name">${esc(p.name)}</div>
+      <div class="pod-sep"></div>
+      <div class="pod-score">${fmtScore(p.score)}</div>
+      <div class="pod-score-lbl">Points</div>
+      <div class="pod-tb">${tbLabel}: ${fmtTb(p.tiebreak, tbMethod)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('podiumOverlay').classList.add('show');
+  podiumPlayers.forEach((_, i) => setTimeout(() => { const el = document.getElementById(`podCard${i}`); if (el) el.classList.add('show'); }, 200 + i*120));
+}
+function hidePodium() {
+  podiumActive = false;
+  document.getElementById('podiumOverlay').classList.remove('show');
+  document.querySelectorAll('.pod-card').forEach(c => c.classList.remove('show'));
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function sortPlayers(state) {
+  if (!state || !Array.isArray(state.players)) return [];
+  return [...state.players].sort((a, b) => b.score - a.score || (b.tiebreak||0) - (a.tiebreak||0) || b.wins - a.wins || a.name.localeCompare(b.name));
+}
+function ordinal(n) { const s=['th','st','nd','rd']; const v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function fmtTb(val, method) { if (val===undefined||val===null) return '—'; if (method==='wins'||method==='black-wins') return String(val); return Number.isInteger(val)?String(val):Number(val).toFixed(1); }
+function fmtScore(s) { return Number.isInteger(s) ? String(s) : Number(s).toFixed(1); }
+function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══════════════════════════════════════════════════════════════
+//  CHESS CLOCKS MODULE — WebSocket, no polling, rAF countdown
+// ═══════════════════════════════════════════════════════════════
+const DISP_CK = (() => {
+  const boardMap = new Map(); // boardId → BoardState
+  let rafId = null;
+
+  function boardDomId(boardId) {
+    return String(boardId).replace(/[^a-zA-Z0-9_-]/g, c => `_${c.charCodeAt(0).toString(16)}_`);
+  }
+
+  function connect() {
+    if (typeof io === 'undefined') {
+      setFooterConn(false, 'Clock server offline');
+      return;
+    }
+
+    const socket = io({ reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
+
+    socket.on('connect', () => {
+      setFooterConn(true, 'Clocks connected');
+    });
+    socket.on('disconnect', () => {
+      setFooterConn(false, 'Clocks disconnected');
+    });
+    socket.on('connect_error', () => {
+      setFooterConn(false, 'Clock server unreachable');
+    });
+
+    // Full snapshot on connect (handles reconnect too)
+    socket.on('clock:fullSync', (allBoards) => {
+      boardMap.clear();
+      Object.values(allBoards).forEach(b => boardMap.set(b.boardId, b));
+      renderClockPanel();
+    });
+
+    // Incremental update — instant reflection of moves / increments
+    socket.on('clock:state', (board) => {
+      boardMap.set(board.boardId, board);
+      // Update only the affected card if the clocks panel is showing
+      if (prActiveTab === 'clocks') renderClockCard(board);
+      else renderClockPanel(); // pre-render so it's ready when tab opens
+    });
+  }
+
+  function setFooterConn(ok, label) {
+    const el = document.getElementById('ftClockConn');
+    el.textContent  = `⏱ ${label}`;
+    el.className    = `ft-clock-conn ${ok ? 'ok' : 'bad'}`;
+  }
+
+  // ── Render all boards ───────────────────────────────────────────────────────
+  function renderClockPanel() {
+    const el = document.getElementById('prClocksView');
+    if (boardMap.size === 0) {
+      el.innerHTML = '<div class="empty-disp"><div class="icon">⏱</div><div>No boards configured yet</div></div>';
+      stopRaf();
+      return;
+    }
+    el.innerHTML = [...boardMap.values()].map(b => clockCardHTML(b)).join('');
+    startRaf();
+  }
+
+  // ── Render / update a single card ──────────────────────────────────────────
+  function renderClockCard(board) {
+    const el = document.getElementById(`ckCard-${boardDomId(board.boardId)}`);
+    if (!el) { renderClockPanel(); return; } // card doesn't exist yet — full re-render
+
+    // Re-inject the card content so colours and classes update instantly
+    // (the rAF loop will keep the digits smooth)
+    el.outerHTML = clockCardHTML(board);
+    startRaf();
+  }
+
+  function clockCardHTML(b) {
+    const statusPill = `<span class="ck-status-pill ${b.status}">${b.status}</span>`;
+    const incLabel   = b.increment > 0 ? `+${b.increment/1000}s` : 'no inc';
+    const domId      = boardDomId(b.boardId);
+
+    const wActive = b.activePlayer === 'white' && b.status === 'running';
+    const bActive = b.activePlayer === 'black' && b.status === 'running';
+    const wMs     = liveMs(b, 'white');
+    const bMs     = liveMs(b, 'black');
+
+    return `<div class="disp-clock-card ${b.status}" id="ckCard-${domId}">
+      <div class="disp-clock-board">${esc(b.boardId)}${statusPill}</div>
+      <div class="disp-clock-row">
+        <div class="disp-clock-face ${wMs<=0?'flagged':wActive?'active':''}" id="ckFaceW-${domId}">
+          <div class="disp-clock-who">⬜ White</div>
+          <div class="disp-clock-time ${timeClass(wMs)}" id="ckTimeW-${domId}">${fmtMs(wMs)}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:4px">${incLabel}</div>
+        </div>
+        <div class="disp-clock-face ${bMs<=0?'flagged':bActive?'active':''}" id="ckFaceB-${domId}">
+          <div class="disp-clock-who">⬛ Black</div>
+          <div class="disp-clock-time ${timeClass(bMs)}" id="ckTimeB-${domId}">${fmtMs(bMs)}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:4px">${incLabel}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── rAF loop — smooth countdown, purely visual ──────────────────────────────
+  // Per spec: remaining = baseRemaining - (Date.now() - lastMoveTimestamp)
+  // Does NOT send anything to the server. Does NOT alter boardMap.
+
+  function startRaf() {
+    if (rafId) return; // already running
+    rafId = requestAnimationFrame(rafTick);
+  }
+  function stopRaf() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  function rafTick() {
+    let anyRunning = false;
+    boardMap.forEach(b => {
+      if (b.status === 'running') { anyRunning = true; updateClockDigits(b); }
+    });
+    rafId = anyRunning ? requestAnimationFrame(rafTick) : null;
+  }
+
+  function updateClockDigits(b) {
+    const wMs = liveMs(b, 'white');
+    const bMs = liveMs(b, 'black');
+    const domId = boardDomId(b.boardId);
+
+    const wtEl = document.getElementById(`ckTimeW-${domId}`);
+    const btEl = document.getElementById(`ckTimeB-${domId}`);
+    const wfEl = document.getElementById(`ckFaceW-${domId}`);
+    const bfEl = document.getElementById(`ckFaceB-${domId}`);
+
+    if (!wtEl || !btEl) return;
+
+    const wActive = b.activePlayer === 'white';
+    const bActive = b.activePlayer === 'black';
+
+    wtEl.textContent = fmtMs(wMs);
+    btEl.textContent = fmtMs(bMs);
+    wtEl.className   = `disp-clock-time ${timeClass(wMs)}`;
+    btEl.className   = `disp-clock-time ${timeClass(bMs)}`;
+
+    if (wfEl) wfEl.className = `disp-clock-face ${wMs<=0?'flagged':wActive?'active':''}`;
+    if (bfEl) bfEl.className = `disp-clock-face ${bMs<=0?'flagged':bActive?'active':''}`;
+  }
+
+  // ── Clock math (mirror of admin) ────────────────────────────────────────────
+  function liveMs(board, player) {
+    if (board.status !== 'running' || board.activePlayer !== player || !board.lastMoveTimestamp) {
+      return player === 'white' ? board.whiteTimeRemaining : board.blackTimeRemaining;
+    }
+    const base = player === 'white' ? board.whiteTimeRemaining : board.blackTimeRemaining;
+    return Math.max(0, base - (Date.now() - board.lastMoveTimestamp));
+  }
+
+  function fmtMs(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(total / 60), s = total % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function timeClass(ms) {
+    if (ms <= 0)     return 'expired';
+    if (ms < 30000)  return 'warning';
+    return '';
+  }
+
+  return { init: connect };
+})();
+
+// ── Keyboard shortcuts (unchanged) ───────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key==='f'||e.key==='F') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen();
+  }
+  if (e.key==='Escape' && podiumActive) hidePodium();
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+DISP_CK.init();
+</script>
+</body>
+</html>
