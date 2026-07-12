@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>Player Card</title>
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --panel: #232323;
+      --line: #3a3a3a;
+      --text: #eeeeec;
+      --muted: #9b9b96;
+      --accent: #d0a24c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      padding: 20px 16px;
+    }
+    .wrap { max-width: 480px; margin: 0 auto; }
+
+    .hd {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 18px 16px;
+    }
+    .title { font-size: 20px; font-weight: 700; }
+    .sub { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.4; }
+    .search {
+      position: relative;
+      margin-top: 14px;
+    }
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 13px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 16px;
+      font-family: inherit;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .suggestions {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      margin-top: 6px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 20;
+      display: none;
+    }
+    .suggestion-item {
+      padding: 10px 13px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover, .suggestion-item.active { background: #2c2c2c; }
+    .meta { margin-top: 10px; color: var(--muted); font-size: 12.5px; }
+
+    .panel {
+      margin-top: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 6px 0; }
+
+    .hero { text-align: center; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+    .hero-main { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+    .hero-sub { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .name { font-size: 20px; font-weight: 700; margin-bottom: 10px; text-align: center; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .row:last-child { border-bottom: none; }
+    .k { color: var(--muted); font-size: 13px; }
+    .v { font-weight: 600; text-align: right; font-size: 15px; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 600; }
+    .w { background: #f2f2ee; color: #1a1a1a; border-color: #d6d6ce; }
+    .b { background: #141414; color: var(--text); border-color: #3a3a3a; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hd">
+      <div class="title">Player Card</div>
+      <div class="sub">Find your table and opponent for this round.</div>
+      <div class="search">
+        <input id="nameInput" placeholder="Enter player name" autocomplete="off" autocapitalize="words" spellcheck="false">
+        <div id="suggestions" class="suggestions"></div>
+      </div>
+      <div class="meta" id="meta">Waiting for the pairings to be uploaded.</div>
+    </div>
+
+    <div class="panel" id="resultPanel">
+      <div class="empty">Type your name and press Enter.</div>
+    </div>
+  </div>
+
+  <script>
+    const STORE_KEY = 'tornelo_display_snapshot_v1';
+    const LAST_NAME_KEY = 'tornelo_player_last_name_v1';
+    const SNAPSHOT_API_PATH = '/api/snapshot';
+
+    let currentSnapshot = null;
+    let currentPlayerName = '';
+    let lastNames = [];
+
+    function normalizeText(v) { return String(v || '').replace(/\s+/g, ' ').trim(); }
+    function getRound(snapshot) {
+      if (!snapshot || !Array.isArray(snapshot.rounds) || !snapshot.rounds.length) return null;
+      return snapshot.rounds[snapshot.rounds.length - 1];
+    }
+    function loadLocalSnapshot() {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+
+    async function pullRemoteSnapshot() {
+      try {
+        const res = await fetch(SNAPSHOT_API_PATH, { cache: 'no-store' });
+        if (!res.ok) return false;
+        const parsed = await res.json();
+        if (!parsed || !Array.isArray(parsed.players)) return false;
+        currentSnapshot = parsed;
+        localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function updateMeta(snapshot) {
+      const meta = document.getElementById('meta');
+      const round = getRound(snapshot);
+      if (!snapshot || !round || !Array.isArray(round.pairings)) {
+        meta.textContent = 'Waiting for the pairings to be uploaded.';
+        return;
+      }
+      const roundNum = snapshot.currentRound || round.number || '—';
+      meta.textContent = `${round.pairings.length} pairings loaded`;
+    }
+
+    function buildNames(snapshot) {
+      const round = getRound(snapshot);
+      if (!snapshot || !round || !Array.isArray(round.pairings) || !Array.isArray(snapshot.players)) return [];
+      const byId = new Map(snapshot.players.map(p => [p.id, p.name]));
+      const names = new Set();
+      round.pairings.forEach(p => {
+        names.add(normalizeText(byId.get(p.white)));
+        names.add(normalizeText(byId.get(p.black)));
+      });
+      return [...names].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    }
+
+    function updateNameList(snapshot) {
+      const names = buildNames(snapshot);
+      lastNames = names;
+    }
+
+    function hideSuggestions() {
+      document.getElementById('suggestions').style.display = 'none';
+      document.getElementById('suggestions').innerHTML = '';
+    }
+
+    function showSuggestions(query) {
+      const box = document.getElementById('suggestions');
+      const q = normalizeText(query).toLowerCase();
+      if (!q) { hideSuggestions(); return; }
+      const matches = lastNames.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
+      if (!matches.length) { hideSuggestions(); return; }
+      box.innerHTML = matches.map(n => `<div class="suggestion-item" data-name="${n.replace(/"/g, '&quot;')}">${n}</div>`).join('');
+      box.style.display = 'block';
+    }
+
+    function selectSuggestionFromEvent(event) {
+      const item = event.target.closest('.suggestion-item');
+      if (!item) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const name = item.getAttribute('data-name') || '';
+      const input = document.getElementById('nameInput');
+      input.value = name;
+      input.blur();
+      saveSelectedName(name);
+      renderPlayer(currentPlayerName, currentSnapshot);
+      hideSuggestions();
+    }
+
+    function renderPlayer(playerName, snapshot) {
+      const panel = document.getElementById('resultPanel');
+      const round = getRound(snapshot);
+      if (!snapshot || !round || !Array.isArray(round.pairings) || !Array.isArray(snapshot.players)) {
+        panel.innerHTML = "<div class=\"empty\">Pairings aren't posted yet — check back soon.</div>";
+        return;
+      }
+      const name = normalizeText(playerName).toLowerCase();
+      if (!name) {
+        panel.innerHTML = '<div class="empty">Type your name and press Enter.</div>';
+        return;
+      }
+
+      const byId = new Map(snapshot.players.map(p => [p.id, p.name]));
+      const scoreByName = new Map(snapshot.players.map(p => [normalizeText(p.name).toLowerCase(), p.score ?? 0]));
+      const pairing = round.pairings.map(p => ({
+        tableNumber: p.tableNumber,
+        white: normalizeText(byId.get(p.white)),
+        black: normalizeText(byId.get(p.black))
+      })).find(p => p.white.toLowerCase() === name || p.black.toLowerCase() === name);
+
+      if (!pairing) {
+        panel.innerHTML = "<div class=\"empty\">Couldn't find that name in this round. Check the spelling and try again.</div>";
+        return;
+      }
+
+      const isWhite = pairing.white.toLowerCase() === name;
+      const roundNum = snapshot.currentRound || round.number || '—';
+      const color = isWhite ? 'White' : 'Black';
+      const opp = isWhite ? pairing.black : pairing.white;
+      const totalScore = scoreByName.get(name);
+
+      panel.innerHTML = `
+        <div class="hero">
+          <div class="hero-main">Table ${pairing.tableNumber ?? '—'}</div>
+          <div class="hero-sub">Round ${roundNum}</div>
+        </div>
+        <div class="name">${isWhite ? pairing.white : pairing.black}</div>
+        <div class="row"><span class="k">Color</span><span class="v"><span class="pill ${isWhite ? 'w' : 'b'}">${color}</span></span></div>
+        <div class="row"><span class="k">Opponent</span><span class="v">${opp}</span></div>
+        <div class="row"><span class="k">Score</span><span class="v">${Number.isFinite(totalScore) ? totalScore : '—'}</span></div>`;
+    }
+
+    function saveSelectedName(name) {
+      const clean = normalizeText(name);
+      currentPlayerName = clean;
+      localStorage.setItem(LAST_NAME_KEY, clean);
+      const url = new URL(location.href);
+      if (clean) url.searchParams.set('name', clean);
+      else url.searchParams.delete('name');
+      history.replaceState(null, '', url.toString());
+    }
+
+    function runFind() {
+      const typed = normalizeText(document.getElementById('nameInput').value);
+      saveSelectedName(typed);
+      renderPlayer(currentPlayerName, currentSnapshot);
+    }
+
+    function autoPickFromInput() {
+      const input = document.getElementById('nameInput');
+      const typed = input.value;
+      showSuggestions(typed);
+    }
+
+    function initSelectedName() {
+      const fromUrl = normalizeText(new URLSearchParams(location.search).get('name'));
+      const fromLocal = normalizeText(localStorage.getItem(LAST_NAME_KEY));
+      currentPlayerName = fromUrl || fromLocal || '';
+      if (currentPlayerName) document.getElementById('nameInput').value = currentPlayerName;
+    }
+
+    async function refreshAll() {
+      const remoteOk = await pullRemoteSnapshot();
+      if (!remoteOk && !currentSnapshot) currentSnapshot = loadLocalSnapshot();
+      updateMeta(currentSnapshot);
+      updateNameList(currentSnapshot);
+      if (currentPlayerName) renderPlayer(currentPlayerName, currentSnapshot);
+    }
+
+    document.getElementById('nameInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        runFind();
+        hideSuggestions();
+      }
+    });
+    document.getElementById('nameInput').addEventListener('input', autoPickFromInput);
+    document.getElementById('nameInput').addEventListener('change', autoPickFromInput);
+    document.getElementById('suggestions').addEventListener('pointerdown', selectSuggestionFromEvent);
+    document.getElementById('suggestions').addEventListener('mousedown', selectSuggestionFromEvent);
+    document.getElementById('suggestions').addEventListener('touchstart', selectSuggestionFromEvent, { passive: false });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search')) hideSuggestions();
+    });
+
+    initSelectedName();
+    refreshAll();
+    setInterval(refreshAll, 5000);
+  </script>
+</body>
+</html>
